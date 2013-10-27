@@ -1,13 +1,14 @@
 package tris
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
 	"github.com/fvbock/trie"
 	"log"
-	// "strings"
-	"bytes"
+	"strings"
 	"sync"
 	"time"
 )
@@ -52,22 +53,55 @@ func NewClient(s *Server, id []byte) *Client {
 
 type Command interface {
 	Name() string
-	Function(s *Server, c *Client, args ...interface{}) (retCode int, reply *Reply)
+	Function(s *Server, c *Client, args ...interface{}) (reply *Reply)
 	Flags() int
 }
 
 const ()
 
 type Reply struct {
+	// buffer
 	Payload    []byte
-	ReturnCode int
+	ReturnCode int64
 }
 
-func (r *Reply) Serialize() []byte {
-	return append(append(r.Payload, []byte("")...), byte(r.ReturnCode))
+func (r *Reply) String() string {
+	return fmt.Sprintf("%v\n%s", r.ReturnCode, r.Payload)
 }
 
-func NewReply(payload []byte, returnCode int) *Reply {
+func (r *Reply) Serialize() (ser []byte) {
+	pl := make([]byte, 4)
+	rc := make([]byte, 1)
+	_ = binary.PutVarint(pl, int64(len(r.Payload)))
+	_ = binary.PutVarint(rc, r.ReturnCode)
+	ser = append(ser, pl...)
+	ser = append(ser, rc...)
+	ser = append(ser, r.Payload...)
+	return
+}
+
+func Unserialize(r []byte) *Reply {
+	buf := bytes.NewBuffer(r)
+	pLength, err := binary.ReadVarint(buf)
+	if err != nil {
+		fmt.Println(err)
+	}
+	rc, err := binary.ReadVarint(buf)
+	if err != nil {
+		fmt.Println(err)
+	}
+	payload := make([]byte, pLength)
+	bRead, err := buf.Read(payload)
+	if err != nil || int64(bRead) != pLength {
+		fmt.Println("frakk. not enough bytes to read", err)
+	}
+	return &Reply{
+		Payload:    payload,
+		ReturnCode: rc,
+	}
+}
+
+func NewReply(payload []byte, returnCode int64) *Reply {
 	return &Reply{
 		Payload:    payload,
 		ReturnCode: returnCode,
@@ -190,7 +224,8 @@ func (s *Server) Start() (err error) {
 			if s.ActiveClients > 0 {
 				_, _ = zmq.Poll(s.PollItems, 1)
 			} else {
-				_, _ = zmq.Poll(s.PollItems, -1)
+				// _, _ = zmq.Poll(s.PollItems, -1)
+				_, _ = zmq.Poll(s.PollItems, 1000000)
 			}
 			switch {
 			case s.PollItems[0].REvents&zmq.POLLIN != 0:
@@ -270,23 +305,29 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 	if err != nil {
 		// TODO
 	}
-	// s.Log.Println("cmds, args:", cmds, args)
+	s.Log.Println("cmds, args:", cmds, args)
 
 	// var retCode int
+	var reply *Reply
 	var replies []*Reply
 
 	for i, cmd := range cmds {
 		// s.Log.Printf("cmd %v: [%v]\n", i, cmd)
-		var cmdName string = string(cmd)
+		var cmdName string = strings.ToUpper(string(cmd))
 		// s.Log.Printf("cmd: [%s]\n", cmdName)
 		if _, exists := s.Commands[cmdName]; !exists {
 			// handle non existing command call
+			reply = NewReply(
+				[]byte(fmt.Sprintf("Unknown Command %s.", string(cmd))),
+				COMMAND_FAIL)
 		} else {
-			_, reply := s.Commands[cmdName].Function(s, c, args[i])
-			replies = append(replies, reply)
-			// s.Log.Println("CMD result:", retCode, err, reply)
+			reply = s.Commands[cmdName].Function(s, c, args[i])
+			if reply.ReturnCode != COMMAND_OK {
+				s.Log.Println(string(reply.Payload))
+			}
 		}
-
+		replies = append(replies, reply)
+		// s.Log.Println("CMD result:", retCode, err, reply)
 	}
 	for rn, rep := range replies {
 		c.Response = append(c.Response, rep.Serialize()...)
