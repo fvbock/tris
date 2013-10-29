@@ -122,17 +122,14 @@ func main() {
 		}
 
 		command = command + "\n"
-		// fmt.Println(command, ierr)
 		r, err := client.Send(command)
 		if err != nil {
 			fmt.Println("Error:", err)
 		}
 
-		// fmt.Println(string(r))
 		response := trisserver.Unserialize(r)
-		fmt.Println(response)
+		fmt.Print(response)
 
-		//	resetstate:
 		// reset state
 		command = ""
 		ierr = nil

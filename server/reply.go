@@ -19,7 +19,18 @@ type Reply struct {
 }
 
 func (r *Reply) String() string {
-	return fmt.Sprintf("%v\n%s", r.ReturnCode, r.Payload)
+	if r.ReturnCode == COMMAND_OK {
+		if len(r.Payload) == 1 {
+			return fmt.Sprintf("%s\n", r.Payload[0])
+		} else {
+			var out string
+			for i, rep := range r.Payload {
+				out += fmt.Sprintf("%v) %s\n", i+1, rep)
+			}
+			return out
+		}
+	}
+	return fmt.Sprintf("%s (Return code %v)\n", r.Payload[0], r.ReturnCode)
 }
 
 func (r *Reply) Serialize() (ser []byte) {
@@ -57,7 +68,7 @@ func Unserialize(r []byte) *Reply {
 			}
 			fmt.Println(err)
 		}
-		fmt.Println("+", pLength, bl)
+		// fmt.Println("+", pLength, bl)
 		buf.Seek(int64(4-bl), 1)
 		if pLength > 0 {
 			payload := make([]byte, pLength)

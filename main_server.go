@@ -19,7 +19,6 @@ func init() {
 
 func main() {
 	server, err := tris.New(Log)
-	server.RegisterCommands(tris.TrisCommands...)
 	if err != nil {
 		Log.Printf("Could not initialize server: %v\n", err)
 	}

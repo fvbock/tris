@@ -118,6 +118,20 @@ func New(logger *log.Logger) (s *Server, err error) {
 }
 
 func (s *Server) Initialize() {
+	// register commands
+	TrisCommands = append(TrisCommands, &CommandInfo{})
+	TrisCommands = append(TrisCommands, &CommandSelect{})
+	TrisCommands = append(TrisCommands, &CommandCreateTrie{})
+	TrisCommands = append(TrisCommands, &CommandAdd{})
+	TrisCommands = append(TrisCommands, &CommandDel{})
+	TrisCommands = append(TrisCommands, &CommandHas{})
+	TrisCommands = append(TrisCommands, &CommandHasPrefix{})
+	TrisCommands = append(TrisCommands, &CommandMembers{})
+	TrisCommands = append(TrisCommands, &CommandPrefixMembers{})
+	TrisCommands = append(TrisCommands, &CommandTree{})
+	s.RegisterCommands(TrisCommands...)
+
+	//
 	s.Databases[DEFAULT_DB] = trie.NewRefCountTrie()
 }
 
@@ -244,7 +258,7 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 	if err != nil {
 		// TODO
 	}
-	s.Log.Println("cmds, args:", cmds, args)
+	// s.Log.Println("cmds, args:", cmds, args)
 
 	// var retCode int
 	var reply *Reply

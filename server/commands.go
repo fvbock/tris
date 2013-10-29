@@ -12,15 +12,6 @@ var (
 )
 
 func init() {
-	TrisCommands = append(TrisCommands, &CommandInfo{})
-	TrisCommands = append(TrisCommands, &CommandSelect{})
-	TrisCommands = append(TrisCommands, &CommandCreateTrie{})
-	TrisCommands = append(TrisCommands, &CommandAdd{})
-	TrisCommands = append(TrisCommands, &CommandHas{})
-	TrisCommands = append(TrisCommands, &CommandHasPrefix{})
-	TrisCommands = append(TrisCommands, &CommandMembers{})
-	TrisCommands = append(TrisCommands, &CommandPrefixMembers{})
-	TrisCommands = append(TrisCommands, &CommandTree{})
 }
 
 // make those "singletons"?
@@ -87,6 +78,22 @@ func (cmd *CommandAdd) Function(s *Server, c *Client, args ...interface{}) (repl
 	key := string(args[0].([]uint8))
 	b := c.ActiveDb.Add(key)
 	return NewReply([][]byte{[]byte(string(b.Count))}, COMMAND_OK)
+}
+
+/*
+CommandDel maps to RefCountTrie.Del()
+*/
+type CommandDel struct{}
+
+func (cmd *CommandDel) Name() string       { return "DEL" }
+func (cmd *CommandDel) Flags() int         { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
+func (cmd *CommandDel) ResponseFlags() int { return COMMAND_REPLY_SINGLE }
+func (cmd *CommandDel) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+	key := string(args[0].([]uint8))
+	if c.ActiveDb.Delete(key) {
+		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK)
+	}
+	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK)
 }
 
 /*
