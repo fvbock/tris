@@ -2,7 +2,6 @@ package tris
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
@@ -55,60 +54,6 @@ type Command interface {
 	Name() string
 	Function(s *Server, c *Client, args ...interface{}) (reply *Reply)
 	Flags() int
-}
-
-const ()
-
-type Reply struct {
-	// buffer
-	Payload    []byte
-	ReturnCode int64
-}
-
-func (r *Reply) String() string {
-	return fmt.Sprintf("%v\n%s", r.ReturnCode, r.Payload)
-}
-
-func (r *Reply) Serialize() (ser []byte) {
-	pl := make([]byte, 4)
-	rc := make([]byte, 1)
-	_ = binary.PutVarint(pl, int64(len(r.Payload)))
-	_ = binary.PutVarint(rc, r.ReturnCode)
-	ser = append(ser, pl...)
-	ser = append(ser, rc...)
-	ser = append(ser, r.Payload...)
-	return
-}
-
-func Unserialize(r []byte) *Reply {
-	buf := bytes.NewBuffer(r)
-	pLength, err := binary.ReadVarint(buf)
-	if err != nil {
-		fmt.Println(err)
-	}
-	rc, err := binary.ReadVarint(buf)
-	if err != nil {
-		fmt.Println(err)
-	}
-	payload := make([]byte, pLength)
-	bRead, err := buf.Read(payload)
-	if err != nil || int64(bRead) != pLength {
-		fmt.Println("frakk. not enough bytes to read", err)
-	}
-	return &Reply{
-		Payload:    payload,
-		ReturnCode: rc,
-	}
-}
-
-func NewReply(payload []byte, returnCode int64) *Reply {
-	return &Reply{
-		Payload:    payload,
-		ReturnCode: returnCode,
-	}
-}
-
-type MultiReply struct {
 }
 
 const (
@@ -168,11 +113,12 @@ func New(logger *log.Logger) (s *Server, err error) {
 		CycleLength:      int64(time.Microsecond) * 500,
 		CheckStateChange: time.Second * 1,
 	}
+	s.Initialize()
 	return
 }
 
 func (s *Server) Initialize() {
-
+	s.Databases[DEFAULT_DB] = trie.NewRefCountTrie()
 }
 
 func (s *Server) RegisterCommands(cmds ...Command) (err error) {
@@ -218,8 +164,7 @@ func (s *Server) Start() (err error) {
 			cycleStart = time.Now()
 			// cycleLength = 0
 
-			// make the poller run in a sep goroutine and push to a channel.
-			// make the main loop _really_ sleep if there is nothing to do
+			// make the poller run in a sep goroutine and push to a channel?
 
 			if s.ActiveClients > 0 {
 				_, _ = zmq.Poll(s.PollItems, 1)
@@ -236,11 +181,7 @@ func (s *Server) Start() (err error) {
 				go s.HandleRequest(msgParts)
 			default:
 				select {
-				// case c := <-s.ResponseQueue:
-				// 	s.PollItems[0].Socket.SendMultipart([][]byte{c.Id, []byte(""), c.Response}, 0)
-				// 	continue
 				case <-stateTicker:
-					// s.Log.Println("check state changes")
 					select {
 					case s.State = <-s.Stateswitch:
 						s.Log.Println("state changed:", s.State)
@@ -278,9 +219,7 @@ func (s *Server) dbExists(name string) bool {
 }
 
 func splitMsgs(payload []byte) (cmds [][]byte, args [][]byte, err error) {
-	// parts := bytes.Split(bytes.Trim(msg, " \n"), []byte(" "))
 	msgs := bytes.Split(bytes.Trim(payload, " "), []byte("\n"))
-	// log.Println("msgs:", msgs)
 	for n, msg := range msgs {
 		parts := bytes.Split(bytes.Trim(msg, " "), []byte(" "))
 		// log.Println("parts:", parts)
@@ -312,22 +251,20 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 	var replies []*Reply
 
 	for i, cmd := range cmds {
-		// s.Log.Printf("cmd %v: [%v]\n", i, cmd)
 		var cmdName string = strings.ToUpper(string(cmd))
-		// s.Log.Printf("cmd: [%s]\n", cmdName)
 		if _, exists := s.Commands[cmdName]; !exists {
 			// handle non existing command call
 			reply = NewReply(
-				[]byte(fmt.Sprintf("Unknown Command %s.", string(cmd))),
+				[][]byte{[]byte(fmt.Sprintf("Unknown Command %s.", string(cmd)))},
 				COMMAND_FAIL)
+			s.Log.Println(len(reply.Payload), reply)
 		} else {
 			reply = s.Commands[cmdName].Function(s, c, args[i])
 			if reply.ReturnCode != COMMAND_OK {
-				s.Log.Println(string(reply.Payload))
+				// s.Log.Println(string(reply.Payload))
 			}
 		}
 		replies = append(replies, reply)
-		// s.Log.Println("CMD result:", retCode, err, reply)
 	}
 	for rn, rep := range replies {
 		c.Response = append(c.Response, rep.Serialize()...)
@@ -335,7 +272,6 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 			c.Response = append(c.Response, []byte("\n")...)
 		}
 	}
-	// s.ResponseQueue <- c
 	s.Lock()
 	s.PollItems[0].Socket.SendMultipart([][]byte{c.Id, []byte(""), c.Response}, 0)
 

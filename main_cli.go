@@ -40,7 +40,7 @@ func init() {
 }
 
 func atexit() {
-	fname := path.Join(os.Getenv("HOME"), ".go.history")
+	fname := path.Join(os.Getenv("HOME"), ".tris.history")
 	f, err := os.OpenFile(fname, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		fmt.Printf("**warning: could not access history file [%s]\n", fname)
@@ -73,8 +73,6 @@ func main() {
 	// TRIS conn
 	flag.Parse()
 	dsnParts := strings.Split(*dsnString, ":")
-	fmt.Printf("Connecting to %s://%s:%s\n", dsnParts[0], dsnParts[1], dsnParts[2])
-
 	port, _ := strconv.ParseInt(dsnParts[2], 10, 32)
 	dsn := &trisclient.DSN{
 		Protocol: dsnParts[0],
