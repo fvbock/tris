@@ -44,9 +44,6 @@ func (r *Reply) Serialize() (ser []byte) {
 		ser = append(ser, payload...)
 	}
 
-	// ser = make([]byte, 5)
-	// _ = binary.PutVarint(ser, int64(len(r.Payload)))
-	// _ = binary.PutVarint(ser, r.ReturnCode)
 	return
 }
 
@@ -68,7 +65,6 @@ func Unserialize(r []byte) *Reply {
 			}
 			fmt.Println(err)
 		}
-		// fmt.Println("+", pLength, bl)
 		buf.Seek(int64(4-bl), 1)
 		if pLength > 0 {
 			payload := make([]byte, pLength)

@@ -6,6 +6,10 @@ import (
 	zmq "github.com/alecthomas/gozmq"
 )
 
+const (
+	VERSION = "0.0.2"
+)
+
 /*
 Structure containing the connection endpoint
 */
@@ -23,6 +27,8 @@ type Client struct {
 	Context   *zmq.Context
 	Socket    *zmq.Socket
 	connected bool
+	ActiveDb  string
+	SessionId string
 }
 
 func NewClient(dsn *DSN, ctx *zmq.Context) (c *Client, err error) {
@@ -55,15 +61,17 @@ func (c *Client) Dial() (err error) {
 		err = errors.New(fmt.Sprintf("Cannot open Socket:%v\n", err))
 		return
 	}
+	c.Socket.SetSockOptInt(zmq.LINGER, 0)
 	c.Socket.Connect(fmt.Sprintf("%v://%v:%v", c.Dsn.Protocol, c.Dsn.Host, c.Dsn.Port))
 	c.connected = true
 	return
 }
 
 /*
-Close the connections zmq socket and zmq context
+Close sends the EXIT commands and then closes the clients zmq socket
 */
 func (c *Client) Close() {
+	_, _ = c.Send("EXIT")
 	if c.connected {
 		c.Socket.Close()
 	}
@@ -76,7 +84,7 @@ Serialize the given payload, send it over the wire and return the
 response data
 */
 func (c *Client) Send(msg string) (response []byte, err error) {
-	c.Socket.Send([]byte(msg), 0)
+	c.Socket.Send([]byte(msg+"\n"), 0)
 	response, err = c.Socket.Recv(0)
 	return
 }

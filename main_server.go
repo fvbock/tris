@@ -2,8 +2,6 @@ package main
 
 import (
 	"github.com/fvbock/tris/server"
-	"log"
-	"os"
 	"runtime"
 	"time"
 )
@@ -13,15 +11,13 @@ var (
 )
 
 func init() {
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(4)
 	config = &tris.ServerConfig{
-		Protocol: "tcp",
-		Host:     "127.0.0.1",
-		Port:     6000,
-
+		Protocol:          "tcp",
+		Host:              "127.0.0.1",
+		Port:              6000,
 		DataDir:           "/home/morpheus/tris_data",
 		StorageFilePrefix: "trie_",
-		Logger:            log.New(os.Stderr, "", log.LstdFlags),
 	}
 }
 
@@ -33,7 +29,7 @@ func main() {
 	server.Start()
 
 	server.Log.Println("Wait for 10 sec")
-	time.Sleep(1000 * time.Second)
+	time.Sleep(10 * time.Second)
 	server.Stop()
 	server.Log.Println("Done")
 }

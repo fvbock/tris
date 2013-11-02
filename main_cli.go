@@ -21,8 +21,7 @@ var dsnString = flag.String("d", "tcp:localhost:6000", "dsn to connect to")
 // var port = flag.String("p", "", "file to run")
 
 func init() {
-	fmt.Println(`TriS cli 0.0.1.
-`)
+	fmt.Printf("TriS cli %s\n", trisclient.VERSION)
 	term = liner.NewLiner()
 
 	fname := path.Join(os.Getenv("HOME"), ".tris.history")
@@ -40,6 +39,7 @@ func init() {
 }
 
 func atexit() {
+	fmt.Println("CLI atexit")
 	fname := path.Join(os.Getenv("HOME"), ".tris.history")
 	f, err := os.OpenFile(fname, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
@@ -63,9 +63,8 @@ func atexit() {
 
 func main() {
 	defer atexit()
-
 	var ierr error = nil // previous interpreter error
-	ps1 := "tris [not connected]> "
+	ps1 := "[not connected]> "
 	// ps2 := "...  "
 	prompt := &ps1
 	command := ""
@@ -90,49 +89,59 @@ func main() {
 		fmt.Println("Context error:", ierr)
 	}
 	client, err := trisclient.NewClient(dsn, ctx)
+	// defer ctx.Close()
 	err = client.Dial()
 	if err != nil {
 		fmt.Println(command, ierr)
 	} else {
-		ps1 = fmt.Sprintf("tris [%s:%v]> ", dsnParts[1], dsnParts[2])
+		ps1 = fmt.Sprintf("%s:%v/[%s]> ", dsnParts[1], dsnParts[2], client.ActiveDb)
 	}
+	defer client.Close()
 
-	for {
-		line, err := term.Prompt(*prompt)
-		if err != nil {
-			if err != io.EOF {
-				ierr = err
+	// check conn
+	r, err := client.Send("PING")
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	response := trisserver.Unserialize(r)
+	if response.ReturnCode != trisserver.COMMAND_OK {
+		fmt.Printf("Initial PING failed:\n%v\n", response)
+	} else {
+		for {
+			line, err := term.Prompt(*prompt)
+			if err != nil {
+				if err != io.EOF {
+					ierr = err
+				} else {
+					ierr = nil
+				}
+				break //os.Exit(0)
+			}
+			if line == "" || line == ";" {
+				// no more input
+				prompt = &ps1
+			}
+
+			command += line
+			if command != "" {
+				for _, ll := range strings.Split(command, "\n") {
+					term.AppendHistory(ll)
+				}
 			} else {
-				ierr = nil
+				continue
 			}
-			break //os.Exit(0)
-		}
-		if line == "" || line == ";" {
-			// no more input
-			prompt = &ps1
-		}
 
-		command += line
-		if command != "" {
-			for _, ll := range strings.Split(command, "\n") {
-				term.AppendHistory(ll)
+			r, err := client.Send(command)
+			if err != nil {
+				fmt.Println("Error:", err)
 			}
-		} else {
-			continue
+
+			response := trisserver.Unserialize(r)
+			fmt.Print(response)
+
+			// reset state
+			command = ""
+			ierr = nil
 		}
-
-		command = command + "\n"
-		r, err := client.Send(command)
-		if err != nil {
-			fmt.Println("Error:", err)
-		}
-
-		response := trisserver.Unserialize(r)
-		fmt.Print(response)
-
-		// reset state
-		command = ""
-		ierr = nil
 	}
-
 }

@@ -8,27 +8,29 @@ import (
 	"github.com/fvbock/trie"
 	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
 )
 
-func init() {
-	// CreateTrie := Command{"CREATE", trie.NewRefCountTrie}
-}
-
 const (
+	VERSION = "0.0.2"
+
 	DEFAULT_DB = "0"
 )
+
+func init() {
+}
 
 type Client struct {
 	Id           []byte
 	Msg          []byte
 	ActiveDbName string
 	ActiveDb     *trie.RefCountTrie
-	Cmds         []Command
-	Args         [][]interface{}
-	Response     []byte
+	// Cmds         []Command
+	// Args         [][]interface{}
+	// Response     []byte
 }
 
 func (c *Client) String() string {
@@ -47,6 +49,7 @@ type Command interface {
 	Name() string
 	Function(s *Server, c *Client, args ...interface{}) (reply *Reply)
 	Flags() int
+	ResponseType() int
 }
 
 const (
@@ -61,6 +64,7 @@ const (
 	COMMAND_REPLY_EMPTY  = 0
 	COMMAND_REPLY_SINGLE = 1
 	COMMAND_REPLY_MULTI  = 2
+	COMMAND_REPLY_NONE   = 3
 
 	COMMAND_OK   = 0
 	COMMAND_FAIL = 1
@@ -68,50 +72,43 @@ const (
 
 type Server struct {
 	sync.RWMutex
-	Log               *log.Logger
-	Config            *ServerConfig
-	Commands          map[string]Command
-	Databases         map[string]*trie.RefCountTrie
-	DatabaseOpCount   map[string]int
-	State             int
-	Stateswitch       chan int
-	CycleLength       int64
-	CheckStateChange  time.Duration
-	DataDir           string
-	StorageFilePrefix string
+	Log              *log.Logger
+	Config           *ServerConfig
+	Commands         map[string]Command
+	Databases        map[string]*trie.RefCountTrie
+	DatabaseOpCount  map[string]int
+	State            int
+	Stateswitch      chan int
+	CycleLength      int64
+	cycleTicker      <-chan time.Time
+	CheckStateChange time.Duration
 
 	// zeromq
-	Protocol  string
-	Host      string
-	Port      int
 	Context   *zmq.Context
 	Socket    *zmq.Socket
 	pollItems zmq.PollItems
 
 	// CommandQueue  chan *Client
-	ActiveClients     int
+	ActiveClients     map[string]*Client
+	InactiveClientIds chan string
+	RequestsRunning   int
 	CommandsProcessed int
 }
 
 func New(config *ServerConfig) (s *Server, err error) {
 	s = &Server{
+		Config: config,
 		// server
 		Commands:          make(map[string]Command),
 		Databases:         make(map[string]*trie.RefCountTrie),
 		Stateswitch:       make(chan int, 1),
 		CycleLength:       int64(time.Microsecond) * 500,
 		CheckStateChange:  time.Second * 1,
-		DataDir:           config.DataDir,
-		StorageFilePrefix: config.StorageFilePrefix,
-
-		// connection
-		Protocol: config.Protocol,
-		Host:     config.Host,
-		Port:     config.Port,
-		//
-		Log: config.Logger,
-
+		ActiveClients:     make(map[string]*Client),
+		InactiveClientIds: make(chan string),
+		Log:               log.New(os.Stderr, "", log.LstdFlags),
 		// stats
+		RequestsRunning:   0,
 		CommandsProcessed: 0,
 	}
 	s.Initialize()
@@ -121,8 +118,8 @@ func New(config *ServerConfig) (s *Server, err error) {
 func (s *Server) Initialize() {
 	// register commands
 	TrisCommands = append(TrisCommands, &CommandInfo{})
-	// TrisCommands = append(TrisCommands, &CommandPing{})
-	// TrisCommands = append(TrisCommands, &CommandPong{})
+	TrisCommands = append(TrisCommands, &CommandExit{})
+	TrisCommands = append(TrisCommands, &CommandPing{})
 	// TrisCommands = append(TrisCommands, &CommandSaveBg{})
 	TrisCommands = append(TrisCommands, &CommandSelect{})
 	TrisCommands = append(TrisCommands, &CommandCreateTrie{})
@@ -139,7 +136,7 @@ func (s *Server) Initialize() {
 
 	//
 
-	dataFiles, err := ioutil.ReadDir(s.DataDir)
+	dataFiles, err := ioutil.ReadDir(s.Config.DataDir)
 	if err != nil {
 
 	}
@@ -158,11 +155,11 @@ func (s *Server) Initialize() {
 }
 
 func (s *Server) loadDataFile(fname string) (err error) {
-	if len(fname) > len(s.StorageFilePrefix) && fname[0:len(s.StorageFilePrefix)] == s.StorageFilePrefix {
-		id := strings.Split(fname, s.StorageFilePrefix)[1]
+	if len(fname) > len(s.Config.StorageFilePrefix) && fname[0:len(s.Config.StorageFilePrefix)] == s.Config.StorageFilePrefix {
+		id := strings.Split(fname, s.Config.StorageFilePrefix)[1]
 		s.Log.Printf("Loading Trie %s\n", id)
 		var tr *trie.RefCountTrie
-		tr, err = trie.RCTLoadFromFile(fmt.Sprintf("%s/%s%s", s.DataDir, s.StorageFilePrefix, id))
+		tr, err = trie.RCTLoadFromFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, id))
 		if err != nil {
 			return
 		}
@@ -200,7 +197,7 @@ func (s *Server) Start() (err error) {
 
 		}
 		s.Socket.SetSockOptInt(zmq.LINGER, 0)
-		s.Socket.Bind(fmt.Sprintf("%s://%s:%v", s.Protocol, s.Host, s.Port))
+		s.Socket.Bind(fmt.Sprintf("%s://%s:%v", s.Config.Protocol, s.Config.Host, s.Config.Port))
 
 		s.Log.Println("Server started...")
 
@@ -210,15 +207,14 @@ func (s *Server) Start() (err error) {
 
 		var cycleLength int64
 		var cycleStart time.Time
+		s.cycleTicker = time.Tick(time.Duration(s.CycleLength) * time.Nanosecond)
 		stateTicker := time.Tick(s.CheckStateChange)
 	mainLoop:
 		for {
 			cycleStart = time.Now()
-			// cycleLength = 0
 
 			// make the poller run in a sep goroutine and push to a channel?
-
-			if s.ActiveClients > 0 {
+			if s.RequestsRunning > 0 {
 				_, _ = zmq.Poll(s.pollItems, 1)
 			} else {
 				// _, _ = zmq.Poll(s.pollItems, -1)
@@ -228,7 +224,7 @@ func (s *Server) Start() (err error) {
 			case s.pollItems[0].REvents&zmq.POLLIN != 0:
 				s.Lock()
 				msgParts, _ := s.pollItems[0].Socket.RecvMultipart(0)
-				s.ActiveClients += 1
+				s.RequestsRunning++
 				s.Unlock()
 				go s.HandleRequest(msgParts)
 			default:
@@ -249,9 +245,9 @@ func (s *Server) Start() (err error) {
 					// s.Log.Println(".")
 				}
 			}
+			s.beforeSleep()
 			cycleLength = time.Now().UnixNano() - cycleStart.UnixNano()
 			if cycleLength < s.CycleLength {
-				// s.Log.Println("Sleep for ns", s.CycleLength-cycleLength)
 				d := (s.CycleLength - cycleLength)
 				time.Sleep(time.Duration(d) * time.Nanosecond)
 			}
@@ -263,8 +259,24 @@ func (s *Server) Start() (err error) {
 	return
 }
 
+func (s *Server) beforeSleep() {
+beforeSleepCycle:
+	for {
+		select {
+		case <-s.cycleTicker:
+			break beforeSleepCycle
+		case cId := <-s.InactiveClientIds:
+			delete(s.ActiveClients, cId)
+			continue
+		default:
+			break
+		}
+	}
+	return
+}
+
 func (s *Server) dbExists(name string) bool {
-	if _, exists := s.Databases[name]; exists {
+	if _, exists := s.Databases[name]; !exists {
 		return false
 	}
 	return true
@@ -291,7 +303,16 @@ func splitMsgs(payload []byte) (cmds [][]byte, args [][]byte, err error) {
 }
 
 func (s *Server) HandleRequest(msgParts [][]byte) {
-	c := NewClient(s, msgParts[0])
+	// c := NewClient(s, msgParts[0])
+	clientKey := string(msgParts[0])
+	var c *Client
+	var unknown bool
+	if c, unknown = s.ActiveClients[clientKey]; !unknown {
+		// s.Log.Println("New Client:", msgParts[0])
+		s.ActiveClients[clientKey] = NewClient(s, msgParts[0])
+		c = s.ActiveClients[clientKey]
+	}
+
 	cmds, args, err := splitMsgs(msgParts[2])
 	if err != nil {
 		// TODO
@@ -317,19 +338,22 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 			}
 		}
 		replies = append(replies, reply)
+		s.Lock()
+		s.CommandsProcessed += 1
+		s.Unlock()
 	}
+
+	var response []byte
 	for rn, rep := range replies {
-		c.Response = append(c.Response, rep.Serialize()...)
+		response = append(response, rep.Serialize()...)
 		if rn > 0 {
-			c.Response = append(c.Response, []byte("\n")...)
+			response = append(response, []byte("\n")...)
 		}
 	}
 	s.Lock()
-	s.pollItems[0].Socket.SendMultipart([][]byte{c.Id, []byte(""), c.Response}, 0)
-
+	s.pollItems[0].Socket.SendMultipart([][]byte{c.Id, []byte(""), response}, 0)
 	// stats
-	s.ActiveClients -= 1
-	s.CommandsProcessed += 1
+	s.RequestsRunning--
 	s.Unlock()
 	// TODO: count db write operations
 }
