@@ -4,6 +4,7 @@ import (
 	// "errors"
 	"fmt"
 	"github.com/fvbock/trie"
+	"strconv"
 	"time"
 )
 
@@ -110,6 +111,22 @@ func (cmd *CommandHas) Function(s *Server, c *Client, args ...interface{}) (repl
 		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK)
 	}
 	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK)
+}
+
+/*
+CommandHasCount maps to RefCountTrie.HasCount()
+*/
+type CommandHasCount struct{}
+
+func (cmd *CommandHasCount) Name() string       { return "HASCOUNT" }
+func (cmd *CommandHasCount) Flags() int         { return COMMAND_FLAG_READ }
+func (cmd *CommandHasCount) ResponseFlags() int { return COMMAND_REPLY_SINGLE }
+func (cmd *CommandHasCount) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+	key := string(args[0].([]uint8))
+	has, count := c.ActiveDb.HasCount(key)
+	s.Log.Println(has, count, string(count))
+	// return NewReply([][]byte{[]byte(string(count))}, COMMAND_OK)
+	return NewReply([][]byte{[]byte(strconv.FormatInt(count, 10))}, COMMAND_OK)
 }
 
 /*
