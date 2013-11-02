@@ -9,23 +9,31 @@ import (
 )
 
 var (
-	Log *log.Logger
+	config *tris.ServerConfig
 )
 
 func init() {
 	runtime.GOMAXPROCS(2)
-	Log = log.New(os.Stderr, "", log.LstdFlags)
+	config = &tris.ServerConfig{
+		Protocol: "tcp",
+		Host:     "127.0.0.1",
+		Port:     6000,
+
+		DataDir:           "/home/morpheus/tris_data",
+		StorageFilePrefix: "trie_",
+		Logger:            log.New(os.Stderr, "", log.LstdFlags),
+	}
 }
 
 func main() {
-	server, err := tris.New(Log)
+	server, err := tris.New(config)
 	if err != nil {
-		Log.Printf("Could not initialize server: %v\n", err)
+		server.Log.Printf("Could not initialize server: %v\n", err)
 	}
 	server.Start()
 
-	Log.Println("Wait for 10 sec")
+	server.Log.Println("Wait for 10 sec")
 	time.Sleep(1000 * time.Second)
 	server.Stop()
-	Log.Println("Done")
+	server.Log.Println("Done")
 }

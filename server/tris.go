@@ -6,6 +6,7 @@ import (
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
 	"github.com/fvbock/trie"
+	"io/ioutil"
 	"log"
 	"strings"
 	"sync"
@@ -14,14 +15,6 @@ import (
 
 func init() {
 	// CreateTrie := Command{"CREATE", trie.NewRefCountTrie}
-}
-
-type ServerConfig struct {
-	Proto []string
-	Host  string
-	Port  []int
-
-	DataDir string
 }
 
 const (
@@ -82,36 +75,44 @@ type Server struct {
 	DatabaseOpCount   map[string]int
 	State             int
 	Stateswitch       chan int
-	CommandsProcessed int
-
-	CycleLength      int64
-	CheckStateChange time.Duration
-
-	ActiveClients int
+	CycleLength       int64
+	CheckStateChange  time.Duration
+	DataDir           string
+	StorageFilePrefix string
 
 	// zeromq
+	Protocol  string
 	Host      string
 	Port      int
 	Context   *zmq.Context
 	Socket    *zmq.Socket
-	PollItems zmq.PollItems
+	pollItems zmq.PollItems
 
 	// CommandQueue  chan *Client
-	ResponseQueue chan *Client
+	ActiveClients     int
+	CommandsProcessed int
 }
 
-func New(logger *log.Logger) (s *Server, err error) {
+func New(config *ServerConfig) (s *Server, err error) {
 	s = &Server{
-		CommandsProcessed: 0,
-		Log:               logger,
+		// server
 		Commands:          make(map[string]Command),
 		Databases:         make(map[string]*trie.RefCountTrie),
 		Stateswitch:       make(chan int, 1),
-		ResponseQueue:     make(chan *Client),
+		CycleLength:       int64(time.Microsecond) * 500,
+		CheckStateChange:  time.Second * 1,
+		DataDir:           config.DataDir,
+		StorageFilePrefix: config.StorageFilePrefix,
 
-		// CycleLength:      int64(time.Millisecond) * 1,
-		CycleLength:      int64(time.Microsecond) * 500,
-		CheckStateChange: time.Second * 1,
+		// connection
+		Protocol: config.Protocol,
+		Host:     config.Host,
+		Port:     config.Port,
+		//
+		Log: config.Logger,
+
+		// stats
+		CommandsProcessed: 0,
 	}
 	s.Initialize()
 	return
@@ -120,19 +121,56 @@ func New(logger *log.Logger) (s *Server, err error) {
 func (s *Server) Initialize() {
 	// register commands
 	TrisCommands = append(TrisCommands, &CommandInfo{})
+	// TrisCommands = append(TrisCommands, &CommandPing{})
+	// TrisCommands = append(TrisCommands, &CommandPong{})
+	// TrisCommands = append(TrisCommands, &CommandSaveBg{})
 	TrisCommands = append(TrisCommands, &CommandSelect{})
 	TrisCommands = append(TrisCommands, &CommandCreateTrie{})
 	TrisCommands = append(TrisCommands, &CommandAdd{})
 	TrisCommands = append(TrisCommands, &CommandDel{})
 	TrisCommands = append(TrisCommands, &CommandHas{})
+	TrisCommands = append(TrisCommands, &CommandHasCount{})
 	TrisCommands = append(TrisCommands, &CommandHasPrefix{})
 	TrisCommands = append(TrisCommands, &CommandMembers{})
+	// TrisCommands = append(TrisCommands, &CommandMembersCount{})
 	TrisCommands = append(TrisCommands, &CommandPrefixMembers{})
 	TrisCommands = append(TrisCommands, &CommandTree{})
 	s.RegisterCommands(TrisCommands...)
 
 	//
+
+	dataFiles, err := ioutil.ReadDir(s.DataDir)
+	if err != nil {
+
+	}
+	for _, f := range dataFiles {
+		s.Log.Println(f)
+		if !f.IsDir() {
+			err := s.loadDataFile(f.Name())
+			if err != nil {
+				s.Log.Printf("Error loading trie file %s: %v\n", f.Name(), err)
+			}
+		}
+
+	}
+
 	s.Databases[DEFAULT_DB] = trie.NewRefCountTrie()
+}
+
+func (s *Server) loadDataFile(fname string) (err error) {
+	if len(fname) > len(s.StorageFilePrefix) && fname[0:len(s.StorageFilePrefix)] == s.StorageFilePrefix {
+		id := strings.Split(fname, s.StorageFilePrefix)[1]
+		s.Log.Printf("Loading Trie %s\n", id)
+		var tr *trie.RefCountTrie
+		tr, err = trie.RCTLoadFromFile(fmt.Sprintf("%s/%s%s", s.DataDir, s.StorageFilePrefix, id))
+		if err != nil {
+			return
+		}
+		s.Databases[id] = tr
+	} else {
+		err = errors.New("")
+	}
+	return
 }
 
 func (s *Server) RegisterCommands(cmds ...Command) (err error) {
@@ -162,11 +200,11 @@ func (s *Server) Start() (err error) {
 
 		}
 		s.Socket.SetSockOptInt(zmq.LINGER, 0)
-		s.Socket.Bind("tcp://127.0.0.1:6000")
+		s.Socket.Bind(fmt.Sprintf("%s://%s:%v", s.Protocol, s.Host, s.Port))
 
 		s.Log.Println("Server started...")
 
-		s.PollItems = zmq.PollItems{
+		s.pollItems = zmq.PollItems{
 			zmq.PollItem{Socket: s.Socket, Events: zmq.POLLIN},
 		}
 
@@ -181,15 +219,15 @@ func (s *Server) Start() (err error) {
 			// make the poller run in a sep goroutine and push to a channel?
 
 			if s.ActiveClients > 0 {
-				_, _ = zmq.Poll(s.PollItems, 1)
+				_, _ = zmq.Poll(s.pollItems, 1)
 			} else {
-				// _, _ = zmq.Poll(s.PollItems, -1)
-				_, _ = zmq.Poll(s.PollItems, 1000000)
+				// _, _ = zmq.Poll(s.pollItems, -1)
+				_, _ = zmq.Poll(s.pollItems, 1000000)
 			}
 			switch {
-			case s.PollItems[0].REvents&zmq.POLLIN != 0:
+			case s.pollItems[0].REvents&zmq.POLLIN != 0:
 				s.Lock()
-				msgParts, _ := s.PollItems[0].Socket.RecvMultipart(0)
+				msgParts, _ := s.pollItems[0].Socket.RecvMultipart(0)
 				s.ActiveClients += 1
 				s.Unlock()
 				go s.HandleRequest(msgParts)
@@ -287,7 +325,7 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 		}
 	}
 	s.Lock()
-	s.PollItems[0].Socket.SendMultipart([][]byte{c.Id, []byte(""), c.Response}, 0)
+	s.pollItems[0].Socket.SendMultipart([][]byte{c.Id, []byte(""), c.Response}, 0)
 
 	// stats
 	s.ActiveClients -= 1
