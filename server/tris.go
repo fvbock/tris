@@ -252,6 +252,7 @@ func (s *Server) Start() (err error) {
 				time.Sleep(time.Duration(d) * time.Nanosecond)
 			}
 		}
+		s.prepareShutdown()
 		s.Log.Println("Server stopped running...")
 		s.State = STATE_STOPPED
 	}(s)
@@ -362,6 +363,7 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 Take care of stuff...
 */
 func (s *Server) prepareShutdown() {
+	s.Log.Println("Preparing server shutdown...")
 }
 
 func (s *Server) Stop() {
