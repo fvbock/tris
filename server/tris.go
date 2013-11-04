@@ -121,6 +121,7 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandExit{})
 	TrisCommands = append(TrisCommands, &CommandPing{})
 	// TrisCommands = append(TrisCommands, &CommandSaveBg{})
+	// TrisCommands = append(TrisCommands, &CommandSaveNow{})
 	TrisCommands = append(TrisCommands, &CommandSelect{})
 	TrisCommands = append(TrisCommands, &CommandCreateTrie{})
 	TrisCommands = append(TrisCommands, &CommandAdd{})
@@ -129,7 +130,6 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandHasCount{})
 	TrisCommands = append(TrisCommands, &CommandHasPrefix{})
 	TrisCommands = append(TrisCommands, &CommandMembers{})
-	// TrisCommands = append(TrisCommands, &CommandMembersCount{})
 	TrisCommands = append(TrisCommands, &CommandPrefixMembers{})
 	TrisCommands = append(TrisCommands, &CommandTree{})
 	s.RegisterCommands(TrisCommands...)
@@ -181,8 +181,6 @@ func (s *Server) RegisterCommands(cmds ...Command) (err error) {
 	}
 	return
 }
-
-// Think of REQ and DEALER sockets as "clients" and REP and ROUTER sockets as "servers". Mostly, you'll want to bind REP and ROUTER sockets, and connect REQ and DEALER sockets to them. It's not always going to be this simple, but it is a clean and memorable place to start.
 
 func (s *Server) Start() (err error) {
 	s.Stateswitch <- STATE_RUNNING

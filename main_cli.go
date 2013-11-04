@@ -14,11 +14,10 @@ import (
 	"strings"
 )
 
-var term *liner.State = nil
-
-var dsnString = flag.String("d", "tcp:localhost:6000", "dsn to connect to")
-
-// var port = flag.String("p", "", "file to run")
+var (
+	term      *liner.State = nil
+	dsnString              = flag.String("d", "tcp:localhost:6000", "dsn to connect to")
+)
 
 func init() {
 	fmt.Printf("TriS cli %s\n", trisclient.VERSION)
