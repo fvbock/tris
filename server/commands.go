@@ -177,7 +177,7 @@ func (cmd *CommandHasCount) Function(s *Server, c *Client, args ...interface{}) 
 	key := string(args[0].([]byte))
 	has, count := c.ActiveDb.HasCount(key)
 	s.Log.Println(has, count, string(count))
-	return NewReply([][]byte{[]byte(strconv.FormatInt(count, 10))}, COMMAND_OK)
+	return NewReply([][]byte{[]byte(strconv.FormatInt(int64(count), 10))}, COMMAND_OK)
 }
 
 /*

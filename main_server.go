@@ -29,7 +29,7 @@ func main() {
 	server.Start()
 
 	server.Log.Println("Wait for 10 sec")
-	time.Sleep(10 * time.Second)
+	time.Sleep(1000 * time.Second)
 	server.Stop()
 	server.Log.Println("Done")
 }
