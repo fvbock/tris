@@ -144,7 +144,6 @@ func (s *Server) Initialize() {
 
 	}
 	for _, f := range dataFiles {
-		s.Log.Println(f)
 		if !f.IsDir() {
 			err := s.loadDataFile(f.Name())
 			if err != nil {
@@ -179,7 +178,7 @@ func (s *Server) RegisterCommands(cmds ...Command) (err error) {
 			err = errors.New(fmt.Sprintf("Command %s has already been registered.", c.Name()))
 			return
 		}
-		s.Log.Println("Registering command", c.Name())
+		// s.Log.Println("Registering command", c.Name())
 		s.Commands[c.Name()] = c
 	}
 	return
