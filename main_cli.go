@@ -78,11 +78,6 @@ func main() {
 		Port:     int(port),
 	}
 	fmt.Printf("Connecting to %s://%s:%v\n", dsn.Protocol, dsn.Host, dsn.Port)
-	dsn = &trisclient.DSN{
-		Protocol: "tcp",
-		Host:     "localhost",
-		Port:     6000,
-	}
 	ctx, err := zmq.NewContext()
 	if err != nil {
 		fmt.Println("Context error:", ierr)
