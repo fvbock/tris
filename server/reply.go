@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/fvbock/tris/util"
 	"io"
+	"time"
 )
 
 const ()
@@ -48,6 +49,8 @@ func (r *Reply) Serialize() (ser []byte) {
 }
 
 func Unserialize(r []byte) *Reply {
+	var unserStart = time.Now()
+	defer func() { fmt.Printf("Unserialize took %v\n", time.Since(unserStart)) }()
 	buf := bytes.NewReader(r)
 	var rc int64
 	rc, _, err := tris.ReadVarint(buf)
@@ -76,7 +79,6 @@ func Unserialize(r []byte) *Reply {
 			reply.Payload = append(reply.Payload, payload)
 		}
 	}
-
 	return reply
 }
 

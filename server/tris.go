@@ -28,6 +28,7 @@ type Client struct {
 	Msg          []byte
 	ActiveDbName string
 	ActiveDb     *trie.RefCountTrie
+	ShowExecTime bool
 	// Cmds         []Command
 	// Args         [][]interface{}
 	// Response     []byte
@@ -42,6 +43,7 @@ func NewClient(s *Server, id []byte) *Client {
 		Id:           id,
 		ActiveDbName: DEFAULT_DB,
 		ActiveDb:     s.Databases[DEFAULT_DB],
+		ShowExecTime: false,
 	}
 }
 
@@ -132,6 +134,7 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandMembers{})
 	TrisCommands = append(TrisCommands, &CommandPrefixMembers{})
 	TrisCommands = append(TrisCommands, &CommandTree{})
+	TrisCommands = append(TrisCommands, &CommandTiming{})
 	s.RegisterCommands(TrisCommands...)
 
 	//
@@ -195,8 +198,8 @@ func (s *Server) Start() (err error) {
 
 		}
 		s.Socket.SetSockOptInt(zmq.LINGER, 0)
+		s.Log.Println(fmt.Sprintf("Binding to %s://%s:%v", s.Config.Protocol, s.Config.Host, s.Config.Port))
 		s.Socket.Bind(fmt.Sprintf("%s://%s:%v", s.Config.Protocol, s.Config.Host, s.Config.Port))
-
 		s.Log.Println("Server started...")
 
 		s.pollItems = zmq.PollItems{
@@ -302,7 +305,6 @@ func splitMsgs(payload []byte) (cmds [][]byte, args [][]byte, err error) {
 }
 
 func (s *Server) HandleRequest(msgParts [][]byte) {
-	// c := NewClient(s, msgParts[0])
 	clientKey := string(msgParts[0])
 	var c *Client
 	var unknown bool
@@ -310,6 +312,10 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 		// s.Log.Println("New Client:", msgParts[0])
 		s.ActiveClients[clientKey] = NewClient(s, msgParts[0])
 		c = s.ActiveClients[clientKey]
+	}
+	var execStart time.Time
+	if c.ShowExecTime {
+		execStart = time.Now()
 	}
 
 	cmds, args, err := splitMsgs(msgParts[2])
@@ -354,6 +360,9 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 	// stats
 	s.RequestsRunning--
 	s.Unlock()
+	if c.ShowExecTime {
+		s.Log.Printf("%s %v took %v\n", cmds, args, time.Since(execStart))
+	}
 	// TODO: count db write operations
 }
 

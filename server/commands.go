@@ -242,3 +242,20 @@ func (cmd *CommandPrefixMembers) Function(s *Server, c *Client, args ...interfac
 
 	return NewReply(mrep, COMMAND_OK)
 }
+
+/*
+CommandTiming toggles the ShowExecTime flag on a client
+*/
+type CommandTiming struct{}
+
+func (cmd *CommandTiming) Name() string      { return "TIMING" }
+func (cmd *CommandTiming) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandTiming) ResponseType() int { return COMMAND_REPLY_EMPTY }
+func (cmd *CommandTiming) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+	if c.ShowExecTime {
+		c.ShowExecTime = false
+	} else {
+		c.ShowExecTime = true
+	}
+	return NewReply([][]byte{}, COMMAND_OK)
+}
