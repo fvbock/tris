@@ -1,13 +1,16 @@
 package tris
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
 	"github.com/fvbock/trie"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"strings"
 	"sync"
@@ -188,22 +191,43 @@ func (s *Server) Start() (err error) {
 	s.Stateswitch <- STATE_RUNNING
 	go func(s *Server) {
 		s.Log.Println("Starting server...")
-		s.Context, err = zmq.NewContext()
-		if err != nil {
 
-		}
-		s.Socket, err = s.Context.NewSocket(zmq.ROUTER)
-		if err != nil {
+		// // zmq
+		// s.Context, err = zmq.NewContext()
+		// if err != nil {
 
-		}
-		s.Socket.SetSockOptInt(zmq.LINGER, 0)
-		s.Log.Println(fmt.Sprintf("Binding to %s://%s:%v", s.Config.Protocol, s.Config.Host, s.Config.Port))
-		s.Socket.Bind(fmt.Sprintf("%s://%s:%v", s.Config.Protocol, s.Config.Host, s.Config.Port))
-		s.Log.Println("Server started...")
+		// }
+		// s.Socket, err = s.Context.NewSocket(zmq.ROUTER)
+		// if err != nil {
 
-		s.pollItems = zmq.PollItems{
-			zmq.PollItem{Socket: s.Socket, Events: zmq.POLLIN},
-		}
+		// }
+		// s.Socket.SetSockOptInt(zmq.LINGER, 0)
+		// s.Log.Println(fmt.Sprintf("Binding to %s://%s:%v", s.Config.Protocol, s.Config.Host, s.Config.Port))
+		// s.Socket.Bind(fmt.Sprintf("%s://%s:%v", s.Config.Protocol, s.Config.Host, s.Config.Port))
+		// s.Log.Println("Server started...")
+
+		// s.pollItems = zmq.PollItems{
+		// 	zmq.PollItem{Socket: s.Socket, Events: zmq.POLLIN},
+		// }
+
+		// std tcp
+		connChannel := func() chan net.Conn {
+			c := make(chan net.Conn)
+			go func() {
+				listener, err := net.Listen(s.Config.Protocol, fmt.Sprintf("%s:%v", s.Config.Host, s.Config.Port))
+				if err != nil {
+					s.Log.Println(err)
+				}
+				for {
+					conn, err := listener.Accept()
+					if err != nil {
+						log.Fatal(err)
+					}
+					c <- conn
+				}
+			}()
+			return c
+		}()
 
 		var cycleLength int64
 		var cycleStart time.Time
@@ -213,38 +237,60 @@ func (s *Server) Start() (err error) {
 		for {
 			cycleStart = time.Now()
 
-			// make the poller run in a sep goroutine and push to a channel?
-			if s.RequestsRunning > 0 {
-				_, _ = zmq.Poll(s.pollItems, 1)
-			} else {
-				// _, _ = zmq.Poll(s.pollItems, -1)
-				_, _ = zmq.Poll(s.pollItems, 1000000)
-			}
-			switch {
-			case s.pollItems[0].REvents&zmq.POLLIN != 0:
-				s.Lock()
-				msgParts, _ := s.pollItems[0].Socket.RecvMultipart(0)
-				s.RequestsRunning++
-				s.Unlock()
-				go s.HandleRequest(msgParts)
-			default:
+			// zmq
+			// // make the poller run in a sep goroutine and push to a channel?
+			// if s.RequestsRunning > 0 {
+			// 	_, _ = zmq.Poll(s.pollItems, 1)
+			// } else {
+			// 	// _, _ = zmq.Poll(s.pollItems, -1)
+			// 	_, _ = zmq.Poll(s.pollItems, 1000000)
+			// }
+			// switch {
+			// case s.pollItems[0].REvents&zmq.POLLIN != 0:
+			// 	s.Lock()
+			// 	msgParts, _ := s.pollItems[0].Socket.RecvMultipart(0)
+			// 	s.RequestsRunning++
+			// 	s.Unlock()
+			// 	go s.HandleRequest(msgParts)
+			// default:
+			// 	select {
+			// 	case <-stateTicker:
+			// 		select {
+			// 		case s.State = <-s.Stateswitch:
+			// 			s.Log.Println("state changed:", s.State)
+			// 			if s.State == STATE_STOP {
+			// 				break mainLoop
+			// 			}
+			// 			if s.State == STATE_RUNNING {
+			// 			}
+			// 		default:
+			// 			time.Sleep(1)
+			// 		}
+			// 	default:
+			// 		// s.Log.Println(".")
+			// 	}
+			// }
+
+			// tcp
+			select {
+			case c := <-connChannel:
+				go s.HandleRequestTCP(c)
+			case <-stateTicker:
 				select {
-				case <-stateTicker:
-					select {
-					case s.State = <-s.Stateswitch:
-						s.Log.Println("state changed:", s.State)
-						if s.State == STATE_STOP {
-							break mainLoop
-						}
-						if s.State == STATE_RUNNING {
-						}
-					default:
-						time.Sleep(1)
+				case s.State = <-s.Stateswitch:
+					s.Log.Println("state changed:", s.State)
+					if s.State == STATE_STOP {
+						break mainLoop
+					}
+					if s.State == STATE_RUNNING {
 					}
 				default:
-					// s.Log.Println(".")
+					time.Sleep(1)
 				}
+			default:
+				// s.Log.Println(".")
 			}
+
 			s.beforeSleep()
 			cycleLength = time.Now().UnixNano() - cycleStart.UnixNano()
 			if cycleLength < s.CycleLength {
@@ -301,6 +347,95 @@ func splitMsgs(payload []byte) (cmds [][]byte, args [][]byte, err error) {
 		}
 	}
 	return
+}
+
+func splitMsg(msg []byte) (cmd []byte, args []byte, err error) {
+	parts := bytes.Split(bytes.Trim(msg, " \n"), []byte(" "))
+	for i, p := range parts {
+		if len(p) == 0 {
+			continue
+		}
+		if i == 0 {
+			cmd = p
+		} else {
+			args = append(args, p...)
+		}
+	}
+	return
+}
+
+func (s *Server) HandleRequestTCP(conn net.Conn) {
+	// s.Log.Println("CONN:", conn)
+	clientKey := conn.RemoteAddr().String()
+	var c *Client
+	var unknown bool
+	if c, unknown = s.ActiveClients[clientKey]; !unknown {
+		s.ActiveClients[clientKey] = NewClient(s, []byte(conn.RemoteAddr().String()))
+		c = s.ActiveClients[clientKey]
+	}
+	var execStart time.Time
+	for {
+		// s.Log.Println("reading...")
+		s.Lock()
+		s.RequestsRunning++
+		s.Unlock()
+		msg, err := bufio.NewReader(conn).ReadBytes('\n')
+		if c.ShowExecTime {
+			execStart = time.Now()
+		}
+
+		// s.Log.Println(msg, err)
+		if err != nil {
+			s.Log.Println("connection closed", err)
+			s.Lock()
+			s.RequestsRunning--
+			s.Unlock()
+			break
+		}
+
+		cmd, args, err := splitMsg(msg)
+		if err != nil {
+			s.Log.Println(err)
+		}
+
+		var reply *Reply
+
+		var cmdName string = strings.ToUpper(string(cmd))
+		if _, exists := s.Commands[cmdName]; !exists {
+			// handle non existing command call
+			reply = NewReply(
+				[][]byte{[]byte(fmt.Sprintf("Unknown Command %s.", string(cmd)))},
+				COMMAND_FAIL)
+			// s.Log.Println(len(reply.Payload), reply)
+		} else {
+			reply = s.Commands[cmdName].Function(s, c, args)
+			if reply.ReturnCode != COMMAND_OK {
+			}
+		}
+
+		s.Lock()
+		s.CommandsProcessed += 1
+		s.Unlock()
+
+		response := reply.Serialize()
+		rLength := make([]byte, 4)
+		_ = binary.PutVarint(rLength, int64(len(response)))
+		response = append(rLength, response...)
+
+		// s.Log.Println("rLength:", rLength)
+		// s.Log.Println("RESPONSE:", response)
+		conn.Write(response)
+		// stats
+		s.Lock()
+		s.RequestsRunning--
+		s.Unlock()
+		if c.ShowExecTime {
+			s.Log.Printf("%s %v took %v\n", cmd, args, time.Since(execStart))
+		}
+	}
+	conn.Close()
+	delete(s.ActiveClients, clientKey)
+	// s.Log.Println("DONE.")
 }
 
 func (s *Server) HandleRequest(msgParts [][]byte) {
@@ -379,9 +514,13 @@ func (s *Server) Stop() {
 		time.Sleep(100 * time.Millisecond)
 	}
 	s.Log.Println("Server teardown.")
-	s.Socket.Close()
-	s.Log.Println("Socket closed.")
-	s.Context.Close()
-	s.Log.Println("Context closed.")
+	// // zmq
+	// s.Socket.Close()
+	// s.Log.Println("Socket closed.")
+	// s.Context.Close()
+	// s.Log.Println("Context closed.")
+
+	// tcp
+
 	s.Log.Println("Stopped server.")
 }

@@ -5,6 +5,11 @@ import (
 	"io"
 )
 
+/*
+these two functions are copies from the std lib with the addition to return
+the nr of bytes the returned (u)int64 occupied.
+*/
+
 var overflow = errors.New("tris.reply: varint overflows a 64-bit integer")
 
 func ReadUvarint(r io.ByteReader) (uint64, int, error) {

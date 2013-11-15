@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	zmq "github.com/alecthomas/gozmq"
 	"github.com/fvbock/tris/client"
 	"log"
 	"runtime"
@@ -11,15 +10,14 @@ import (
 )
 
 func init() {
-	runtime.GOMAXPROCS(2)
+	runtime.GOMAXPROCS(1)
 }
 
 func main() {
 	// test calls
-	var nrq int = 500
+	var nrq int = 1000
 	// var responses [][]byte
 	var responses []string
-	ctx, _ := zmq.NewContext()
 	dsn := &tris.DSN{
 		Protocol: "tcp",
 		Host:     "localhost",
@@ -28,27 +26,33 @@ func main() {
 	wg := sync.WaitGroup{}
 	startA := time.Now()
 	for i := 0; i < nrq; i++ {
-		if i%4 != 0 {
-			time.Sleep(time.Millisecond * time.Duration(1000/nrq))
-		}
+		// if i%2 != 0 {
+		// 	time.Sleep(time.Millisecond * time.Duration(2000/nrq))
+		// }
+		time.Sleep(time.Millisecond * time.Duration(2000/nrq))
 		wg.Add(1)
-		go func(msgnr int, ztx *zmq.Context) {
+		go func(msgnr int) {
 			// start := time.Now()
-			sock, _ := ztx.NewSocket(zmq.REQ)
-			sock.Connect(fmt.Sprintf("%v://%v:%v", dsn.Protocol, dsn.Host, dsn.Port))
+			c, _ := tris.NewTCPClient(dsn)
+			err := c.Dial()
+			for err != nil {
+				log.Printf("Dial failed: %v\n", err)
+				err = c.Dial()
+			}
 			// log.Printf("connect done in %v\n", time.Since(start))
 			start := time.Now()
-			msg := fmt.Sprintf("INFO\nSELECT a\nINFO\n")
-			sock.Send([]byte(msg), 0)
-			r, err := sock.Recv(0)
+			msg := fmt.Sprintf("INFO\nSELECT a\nINFO")
+			r, err := c.Send(msg)
 			if err != nil {
 				log.Printf("Call failed: %v\n", err)
 			}
 			// log.Println("GOT a reply:", string(r))
 			responses = append(responses, string(r))
 			log.Printf("done in %v\n", time.Since(start))
+			// exit
+			c.Close()
 			wg.Done()
-		}(i, ctx)
+		}(i)
 	}
 	wg.Wait()
 	log.Printf("%v reqs done in %v\n", nrq, time.Since(startA))

@@ -11,11 +11,11 @@ var (
 )
 
 func init() {
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(3)
 	config = &tris.ServerConfig{
 		Protocol:          "tcp",
 		Host:              "127.0.0.1",
-		Port:              6000,
+		Port:              16000,
 		DataDir:           "/home/morpheus/tris_data",
 		StorageFilePrefix: "trie_",
 	}

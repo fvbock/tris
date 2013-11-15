@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	zmq "github.com/alecthomas/gozmq"
 	trisclient "github.com/fvbock/tris/client"
 	trisserver "github.com/fvbock/tris/server"
 	"github.com/sbinet/liner"
@@ -78,12 +77,9 @@ func main() {
 		Port:     int(port),
 	}
 	fmt.Printf("Connecting to %s://%s:%v\n", dsn.Protocol, dsn.Host, dsn.Port)
-	ctx, err := zmq.NewContext()
-	if err != nil {
-		fmt.Println("Context error:", ierr)
-	}
-	client, err := trisclient.NewClient(dsn, ctx)
-	// defer ctx.Close()
+
+	client, err := trisclient.NewTCPClient(dsn)
+
 	err = client.Dial()
 	if err != nil {
 		fmt.Println(command, ierr)
@@ -98,6 +94,7 @@ func main() {
 		fmt.Println("Error:", err)
 	}
 	response := trisserver.Unserialize(r)
+	fmt.Printf("PING:\n%v\n", response)
 	if response.ReturnCode != trisserver.COMMAND_OK {
 		fmt.Printf("Initial PING failed:\n%v\n", response)
 	} else {
