@@ -89,7 +89,8 @@ func (cmd *CommandSelect) Name() string      { return "SELECT" }
 func (cmd *CommandSelect) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandSelect) ResponseType() int { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandSelect) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	name := string(args[0].([]byte))
+	// name := string(args[0].([]byte))
+	name := args[0].(string)
 	if !s.dbExists(name) {
 		err := fmt.Sprintf("Databases %s does not exist.", name)
 		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
@@ -108,14 +109,15 @@ func (cmd *CommandCreateTrie) Name() string      { return "CREATE" }
 func (cmd *CommandCreateTrie) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
 func (cmd *CommandCreateTrie) ResponseType() int { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandCreateTrie) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	name := string(args[0].([]byte))
+	// name := string(args[0].([]byte))
+	name := args[0].(string)
 	s.Lock()
+	defer s.Unlock()
 	if s.dbExists(name) {
 		err := fmt.Sprintf("Databases %s has already been registered.", name)
 		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
 	}
 	s.Databases[name] = trie.NewRefCountTrie()
-	s.Unlock()
 	return NewReply([][]byte{}, COMMAND_OK)
 }
 
@@ -128,7 +130,8 @@ func (cmd *CommandAdd) Name() string      { return "ADD" }
 func (cmd *CommandAdd) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
 func (cmd *CommandAdd) ResponseType() int { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandAdd) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	key := string(args[0].([]byte))
+	// key := string(args[0].([]byte))
+	key := args[0].(string)
 	b := c.ActiveDb.Add(key)
 	return NewReply([][]byte{[]byte(string(b.Count))}, COMMAND_OK)
 }
@@ -142,7 +145,8 @@ func (cmd *CommandDel) Name() string      { return "DEL" }
 func (cmd *CommandDel) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
 func (cmd *CommandDel) ResponseType() int { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandDel) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	key := string(args[0].([]byte))
+	// key := string(args[0].([]byte))
+	key := args[0].(string)
 	if c.ActiveDb.Delete(key) {
 		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK)
 	}
@@ -158,7 +162,8 @@ func (cmd *CommandHas) Name() string      { return "HAS" }
 func (cmd *CommandHas) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandHas) ResponseType() int { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandHas) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	key := string(args[0].([]byte))
+	// key := string(args[0].([]byte))
+	key := args[0].(string)
 	if c.ActiveDb.Has(key) {
 		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK)
 	}
@@ -174,7 +179,8 @@ func (cmd *CommandHasCount) Name() string      { return "HASCOUNT" }
 func (cmd *CommandHasCount) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandHasCount) ResponseType() int { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandHasCount) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	key := string(args[0].([]byte))
+	// key := string(args[0].([]byte))
+	key := args[0].(string)
 	has, count := c.ActiveDb.HasCount(key)
 	s.Log.Println(has, count, string(count))
 	return NewReply([][]byte{[]byte(strconv.FormatInt(int64(count), 10))}, COMMAND_OK)
@@ -189,7 +195,8 @@ func (cmd *CommandHasPrefix) Name() string      { return "HASPREFIX" }
 func (cmd *CommandHasPrefix) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandHasPrefix) ResponseType() int { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandHasPrefix) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	key := string(args[0].([]byte))
+	// key := string(args[0].([]byte))
+	key := args[0].(string)
 	if c.ActiveDb.HasPrefix(key) {
 		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK)
 	}
@@ -234,7 +241,8 @@ func (cmd *CommandPrefixMembers) Name() string      { return "PREFIXMEMBERS" }
 func (cmd *CommandPrefixMembers) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandPrefixMembers) ResponseType() int { return COMMAND_REPLY_MULTI }
 func (cmd *CommandPrefixMembers) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-	key := string(args[0].([]byte))
+	// key := string(args[0].([]byte))
+	key := args[0].(string)
 	var mrep [][]byte
 	for _, m := range c.ActiveDb.PrefixMembers(key) {
 		mrep = append(mrep, []byte(m.Value))
@@ -257,5 +265,41 @@ func (cmd *CommandTiming) Function(s *Server, c *Client, args ...interface{}) (r
 	} else {
 		c.ShowExecTime = true
 	}
+	return NewReply([][]byte{}, COMMAND_OK)
+}
+
+/*
+CommandImportDb toggles the ShowExecTime flag on a client
+*/
+type CommandImportDb struct{}
+
+func (cmd *CommandImportDb) Name() string      { return "IMPORT" }
+func (cmd *CommandImportDb) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandImportDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
+func (cmd *CommandImportDb) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+
+	// filename := string(args[0].([]byte))
+	filename := args[0].(string)
+	// dbname := string(args[1].([]byte))
+	dbname := args[1].(string)
+	s.Lock()
+	if s.dbExists(dbname) {
+		err := fmt.Sprintf("Databases %s already exists.", dbname)
+		s.Log.Println(err)
+		s.Unlock()
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
+	}
+	s.Databases[dbname] = trie.NewRefCountTrie()
+	s.Unlock()
+	s.Databases[dbname].Root.Lock()
+	defer s.Databases[dbname].Root.Unlock()
+	tr, err := trie.RCTLoadFromFile(filename)
+	if err != nil {
+		err := fmt.Sprintf("Database import failed: %v", err)
+		s.Log.Println(err)
+		delete(s.Databases, dbname)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
+	}
+	s.Databases[dbname] = tr
 	return NewReply([][]byte{}, COMMAND_OK)
 }

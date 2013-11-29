@@ -124,6 +124,7 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandPing{})
 	// TrisCommands = append(TrisCommands, &CommandSaveBg{})
 	// TrisCommands = append(TrisCommands, &CommandSaveNow{})
+	TrisCommands = append(TrisCommands, &CommandImportDb{})
 	TrisCommands = append(TrisCommands, &CommandSelect{})
 	TrisCommands = append(TrisCommands, &CommandCreateTrie{})
 	TrisCommands = append(TrisCommands, &CommandAdd{})
@@ -283,20 +284,19 @@ func (s *Server) dbExists(name string) bool {
 	return true
 }
 
-func splitMsgs(payload []byte) (cmds [][]byte, args [][]byte, err error) {
+func splitMsgs(payload []byte) (cmds []string, args [][]interface{}, err error) {
 	msgs := bytes.Split(bytes.Trim(payload, " "), []byte("\n"))
 	for n, msg := range msgs {
 		parts := bytes.Split(bytes.Trim(msg, " "), []byte(" "))
-		// log.Println("parts:", parts)
 		for i, p := range parts {
 			if len(p) == 0 {
 				continue
 			}
 			if i == 0 {
-				cmds = append(cmds, p)
-				args = append(args, []byte{})
+				cmds = append(cmds, string(p))
+				args = append(args, make([]interface{}, 0))
 			} else {
-				args[n] = append(args[n], p...)
+				args[n] = append(args[n], string(p))
 			}
 		}
 	}
@@ -308,7 +308,6 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 	var c *Client
 	var unknown bool
 	if c, unknown = s.ActiveClients[clientKey]; !unknown {
-		// s.Log.Println("New Client:", msgParts[0])
 		s.ActiveClients[clientKey] = NewClient(s, msgParts[0])
 		c = s.ActiveClients[clientKey]
 	}
@@ -321,24 +320,22 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 	if err != nil {
 		// TODO
 	}
-	// s.Log.Println("cmds, args:", cmds, args)
 
 	// var retCode int
 	var reply *Reply
 	var replies []*Reply
 
 	for i, cmd := range cmds {
-		var cmdName string = strings.ToUpper(string(cmd))
+		var cmdName string = strings.ToUpper(cmd)
 		if _, exists := s.Commands[cmdName]; !exists {
 			// handle non existing command call
 			reply = NewReply(
-				[][]byte{[]byte(fmt.Sprintf("Unknown Command %s.", string(cmd)))},
+				[][]byte{[]byte(fmt.Sprintf("Unknown Command %s.", cmd))},
 				COMMAND_FAIL)
-			s.Log.Println(len(reply.Payload), reply)
 		} else {
-			reply = s.Commands[cmdName].Function(s, c, args[i])
+			reply = s.Commands[cmdName].Function(s, c, args[i]...)
 			if reply.ReturnCode != COMMAND_OK {
-				// s.Log.Println(string(reply.Payload))
+				s.Log.Println(string(reply.Payload[0]))
 			}
 		}
 		replies = append(replies, reply)
