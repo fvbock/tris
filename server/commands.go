@@ -1,9 +1,10 @@
 package tris
 
 import (
-	// "errors"
 	"fmt"
 	"github.com/fvbock/trie"
+	"github.com/fvbock/tris/util"
+	"os"
 	"strconv"
 )
 
@@ -118,6 +119,12 @@ func (cmd *CommandCreateTrie) Function(s *Server, c *Client, args ...interface{}
 		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
 	}
 	s.Databases[name] = trie.NewRefCountTrie()
+	err := s.Databases[name].DumpToFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, name))
+	if err != nil {
+		errMsg := fmt.Sprintf("Could persist the new db %s: %v", name, err)
+		s.Log.Println(errMsg)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL)
+	}
 	return NewReply([][]byte{}, COMMAND_OK)
 }
 
@@ -269,7 +276,7 @@ func (cmd *CommandTiming) Function(s *Server, c *Client, args ...interface{}) (r
 }
 
 /*
-CommandImportDb toggles the ShowExecTime flag on a client
+CommandImportDb imports a a database from a file into a new database
 */
 type CommandImportDb struct{}
 
@@ -277,10 +284,7 @@ func (cmd *CommandImportDb) Name() string      { return "IMPORT" }
 func (cmd *CommandImportDb) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandImportDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandImportDb) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
-
-	// filename := string(args[0].([]byte))
 	filename := args[0].(string)
-	// dbname := string(args[1].([]byte))
 	dbname := args[1].(string)
 	s.Lock()
 	if s.dbExists(dbname) {
@@ -301,5 +305,66 @@ func (cmd *CommandImportDb) Function(s *Server, c *Client, args ...interface{}) 
 		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
 	}
 	s.Databases[dbname] = tr
+
+	// persist the db
+	err = s.Databases[dbname].DumpToFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, dbname))
+	if err != nil {
+		errMsg := fmt.Sprintf("Could persist the imported db %s: %v", dbname, err)
+		s.Log.Println(errMsg)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL)
+	}
+	return NewReply([][]byte{}, COMMAND_OK)
+}
+
+/*
+CommandSave saves a full Trie to disk in a separate process
+*/
+type CommandSave struct{}
+
+func (cmd *CommandSave) Name() string      { return "SAVE" }
+func (cmd *CommandSave) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandSave) ResponseType() int { return COMMAND_REPLY_EMPTY }
+func (cmd *CommandSave) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+	if c.ActiveDbName == DEFAULT_DB {
+		err := fmt.Sprintf("Manually saving the default DB is not permitted.")
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
+	}
+	dbBackupPath := fmt.Sprintf("%s/%s_bak", s.Config.DataDir, c.ActiveDbName)
+	exists, err := tris.PathExists(dbBackupPath)
+	if !exists {
+		if err != nil {
+			errMsg := fmt.Sprintf("Could not stat directory %s for backup files: %v", dbBackupPath, err)
+			s.Log.Println(errMsg)
+			return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL)
+		} else {
+			err = os.Mkdir(dbBackupPath, 0777)
+			if err != nil {
+				errMsg := fmt.Sprintf("Could not create directory %s for backup files: %v", dbBackupPath, err)
+				s.Log.Println(errMsg)
+				return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL)
+			}
+		}
+	}
+
+	// copy the old file into the backup folder
+	// TODO: this should be dropped and be replaced by a write ops log + timestamp
+	srcFile := fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, c.ActiveDbName)
+	dstFile := fmt.Sprintf("%s/%s", dbBackupPath, c.ActiveDbName)
+	c.ActiveDb.Root.Lock()
+	err = tris.CopyFile(srcFile, dstFile)
+	c.ActiveDb.Root.Unlock()
+	if err != nil {
+		errMsg := fmt.Sprintf("Could backup the previous data file: %v", err)
+		s.Log.Println(errMsg)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL)
+	}
+
+	err = c.ActiveDb.DumpToFile(srcFile)
+	if err != nil {
+		errMsg := fmt.Sprintf("Could persist the db %s: %v", c.ActiveDbName, err)
+		s.Log.Println(errMsg)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL)
+	}
+
 	return NewReply([][]byte{}, COMMAND_OK)
 }

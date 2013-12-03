@@ -131,7 +131,8 @@ func main() {
 			}
 
 			response := trisserver.Unserialize(r)
-			fmt.Print(response)
+			// fmt.Println(response)
+			response.Print()
 
 			// reset state
 			command = ""

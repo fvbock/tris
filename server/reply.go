@@ -19,19 +19,18 @@ type Reply struct {
 	Type       int
 }
 
-func (r *Reply) String() string {
+func (r *Reply) Print() {
 	if r.ReturnCode == COMMAND_OK {
 		if len(r.Payload) == 1 {
-			return fmt.Sprintf("%s\n", r.Payload[0])
+			fmt.Printf("%s\n", r.Payload[0])
 		} else {
-			var out string
 			for i, rep := range r.Payload {
-				out += fmt.Sprintf("%v) %s\n", i+1, rep)
+				fmt.Printf("%v) %s\n", i+1, rep)
 			}
-			return out
 		}
+		return
 	}
-	return fmt.Sprintf("%s (Return code %v)\n", r.Payload[0], r.ReturnCode)
+	fmt.Printf("%s (Return code %v)\n", r.Payload[0], r.ReturnCode)
 }
 
 func (r *Reply) Serialize() (ser []byte) {
