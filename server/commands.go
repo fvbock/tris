@@ -336,6 +336,33 @@ func (cmd *CommandImportDb) Function(s *Server, c *Client, args ...interface{}) 
 }
 
 /*
+CommandMergeDb merges a a database from a file into a new database
+*/
+type CommandMergeDb struct{}
+
+func (cmd *CommandMergeDb) Name() string      { return "MERGE" }
+func (cmd *CommandMergeDb) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandMergeDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
+func (cmd *CommandMergeDb) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+	filename := args[0].(string)
+	err := c.ActiveDb.RCTMergeFromFile(filename)
+	if err != nil {
+		err := fmt.Sprintf("Database merge failed: %v", err)
+		s.Log.Println(err)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
+	}
+
+	// persist the db
+	err = c.ActiveDb.DumpToFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, c.ActiveDbName))
+	if err != nil {
+		errMsg := fmt.Sprintf("Could persist the mergeed db %s: %v", c.ActiveDbName, err)
+		s.Log.Println(errMsg)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL)
+	}
+	return NewReply([][]byte{}, COMMAND_OK)
+}
+
+/*
 CommandSave saves a full Trie to disk in a separate process
 */
 type CommandSave struct{}

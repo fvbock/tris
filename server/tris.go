@@ -54,6 +54,13 @@ type Command interface {
 	ResponseType() int
 }
 
+type Database struct {
+	Name string
+	Db   *trie.RefCountTrie
+}
+
+// TODO: move persisting into the Database struct
+
 const (
 	STATE_STOP    = 1
 	STATE_STOPPED = 2
@@ -125,6 +132,7 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandPing{})
 	TrisCommands = append(TrisCommands, &CommandSave{})
 	TrisCommands = append(TrisCommands, &CommandImportDb{})
+	TrisCommands = append(TrisCommands, &CommandMergeDb{})
 	TrisCommands = append(TrisCommands, &CommandSelect{})
 	TrisCommands = append(TrisCommands, &CommandCreateTrie{})
 	// TrisCommands = append(TrisCommands, &CommandFlushTrie{})
@@ -220,7 +228,6 @@ func (s *Server) Start() (err error) {
 			if s.RequestsRunning > 0 {
 				_, _ = zmq.Poll(s.pollItems, 1)
 			} else {
-				// _, _ = zmq.Poll(s.pollItems, -1)
 				_, _ = zmq.Poll(s.pollItems, 1000000)
 			}
 			switch {
@@ -324,7 +331,6 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 		// TODO
 	}
 
-	// var retCode int
 	var reply *Reply
 	var replies []*Reply
 
