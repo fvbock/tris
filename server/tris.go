@@ -153,7 +153,6 @@ func (s *Server) Initialize() {
 				s.Log.Printf("Error loading trie file %s: %v\n", f.Name(), err)
 			}
 		}
-
 	}
 
 	s.Databases[DEFAULT_DB] = trie.NewRefCountTrie()

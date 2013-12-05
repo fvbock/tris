@@ -2,6 +2,7 @@ package tris
 
 import (
 	"log"
+	"time"
 )
 
 type ServerConfig struct {
@@ -11,6 +12,10 @@ type ServerConfig struct {
 
 	DataDir           string
 	StorageFilePrefix string
+
+	// persistance intervals on a per db basis
+	PersistInterval time.Duration
+	PersistOpsLimit int
 
 	Logger *log.Logger
 }
