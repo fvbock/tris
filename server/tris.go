@@ -138,6 +138,7 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandPrefixMembers{})
 	TrisCommands = append(TrisCommands, &CommandTree{})
 	TrisCommands = append(TrisCommands, &CommandTiming{})
+	TrisCommands = append(TrisCommands, &CommandShutdown{})
 	s.RegisterCommands(TrisCommands...)
 
 	//
@@ -257,6 +258,7 @@ func (s *Server) Start() (err error) {
 		s.prepareShutdown()
 		s.Log.Println("Server stopped running...")
 		s.State = STATE_STOPPED
+		s.shutdown()
 	}(s)
 	s.Log.Println("Server starting...")
 	return
@@ -363,23 +365,28 @@ func (s *Server) HandleRequest(msgParts [][]byte) {
 	// TODO: count db write operations
 }
 
+func (s *Server) Stop() {
+	s.Log.Println("Stopping server.")
+	s.Stateswitch <- STATE_STOP
+}
+
 /*
 Take care of stuff...
 */
 func (s *Server) prepareShutdown() {
 	s.Log.Println("Preparing server shutdown...")
-}
-
-func (s *Server) Stop() {
-	s.Log.Println("Stopping server.")
-	s.Stateswitch <- STATE_STOP
-	for s.State != STATE_STOPPED {
+	for s.RequestsRunning > 0 {
+		s.Log.Println("Requests running:", s.RequestsRunning)
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+func (s *Server) shutdown() {
 	s.Log.Println("Server teardown.")
 	s.Socket.Close()
 	s.Log.Println("Socket closed.")
 	s.Context.Close()
 	s.Log.Println("Context closed.")
 	s.Log.Println("Stopped server.")
+	os.Exit(0)
 }
