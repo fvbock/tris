@@ -54,6 +54,42 @@ Commands Running: %v
 }
 
 /*
+CommandDbInfo sets the actuve database on the server client (the connection)
+*/
+type CommandDbInfo struct{}
+
+func (cmd *CommandDbInfo) Name() string      { return "DBINFO" }
+func (cmd *CommandDbInfo) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandDbInfo) ResponseType() int { return COMMAND_REPLY_SINGLE }
+func (cmd *CommandDbInfo) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+	var dbNames string
+	var n int = 1
+	for name, _ := range s.Databases {
+		if name != DEFAULT_DB {
+			dbNames += fmt.Sprintf("    %v) %s\n", n, name)
+			n += 1
+		}
+	}
+	serverStr := fmt.Sprintf(`Tris %s.
+Host: %s
+Port: %v
+DataDir: %s
+
+Databases:
+  Default DB: %s
+  User DBs:
+%v
+
+ActiveClients: %v
+Commands Processed: %v
+Commands Running: %v
+`, VERSION, s.Config.Host, s.Config.Port, s.Config.DataDir, DEFAULT_DB, dbNames, len(s.ActiveClients), s.CommandsProcessed, s.RequestsRunning)
+
+	reply = NewReply([][]byte{[]byte(fmt.Sprintf("SERVER\n%v\nCLIENT\n%s", serverStr, c))}, COMMAND_OK)
+	return
+}
+
+/*
 CommandExit sets the actuve database on the server client (the connection)
 */
 type CommandExit struct{}
