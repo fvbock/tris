@@ -14,6 +14,8 @@ import (
 	"strings"
 )
 
+// TODO: detect connection loss and handle reconnect + currentDB
+
 var (
 	term      *liner.State = nil
 	dsnString              = flag.String("d", "tcp:localhost:6000", "dsn to connect to")
