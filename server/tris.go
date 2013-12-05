@@ -120,6 +120,7 @@ func New(config *ServerConfig) (s *Server, err error) {
 func (s *Server) Initialize() {
 	// register commands
 	TrisCommands = append(TrisCommands, &CommandInfo{})
+	TrisCommands = append(TrisCommands, &CommandDbInfo{})
 	TrisCommands = append(TrisCommands, &CommandExit{})
 	TrisCommands = append(TrisCommands, &CommandPing{})
 	TrisCommands = append(TrisCommands, &CommandSave{})
