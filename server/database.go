@@ -29,6 +29,15 @@ func (d *Database) Persist(fname string) (err error) {
 	return
 }
 
+// TODO
+func (d *Database) OpsLimitPersist(fname string) (err error) {
+	// err = d.Db.DumpToFile(fname)
+	// if err != nil {
+	// 	err = errors.New(fmt.Sprintf("Could persist the db %s: %v", d.Name, err))
+	// }
+	return
+}
+
 func (d *Database) Backup(srcFilePath string, dstPath string, dstFile string) (err error) {
 	exists, err := tris.PathExists(dstPath)
 	if !exists {

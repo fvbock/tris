@@ -193,7 +193,7 @@ CommandAdd maps to RefCountTrie.Add()
 type CommandAdd struct{}
 
 func (cmd *CommandAdd) Name() string      { return "ADD" }
-func (cmd *CommandAdd) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
+func (cmd *CommandAdd) Flags() int        { return COMMAND_FLAG_WRITE }
 func (cmd *CommandAdd) ResponseType() int { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandAdd) Help() string      { return "TODO" }
 func (cmd *CommandAdd) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
@@ -208,7 +208,7 @@ CommandDel maps to RefCountTrie.Del()
 type CommandDel struct{}
 
 func (cmd *CommandDel) Name() string      { return "DEL" }
-func (cmd *CommandDel) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
+func (cmd *CommandDel) Flags() int        { return COMMAND_FLAG_WRITE }
 func (cmd *CommandDel) ResponseType() int { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandDel) Help() string      { return "TODO" }
 func (cmd *CommandDel) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
@@ -342,7 +342,7 @@ CommandImportDb imports a a database from a file into a new database
 type CommandImportDb struct{}
 
 func (cmd *CommandImportDb) Name() string      { return "IMPORT" }
-func (cmd *CommandImportDb) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandImportDb) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
 func (cmd *CommandImportDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandImportDb) Help() string      { return "TODO" }
 func (cmd *CommandImportDb) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
@@ -384,7 +384,7 @@ CommandMergeDb merges a a database from a file into a new database
 type CommandMergeDb struct{}
 
 func (cmd *CommandMergeDb) Name() string      { return "MERGE" }
-func (cmd *CommandMergeDb) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandMergeDb) Flags() int        { return COMMAND_FLAG_WRITE }
 func (cmd *CommandMergeDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandMergeDb) Help() string      { return "TODO" }
 func (cmd *CommandMergeDb) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
@@ -414,7 +414,7 @@ CommandSave saves a full Trie to disk in a separate process
 type CommandSave struct{}
 
 func (cmd *CommandSave) Name() string      { return "SAVE" }
-func (cmd *CommandSave) Flags() int        { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandSave) Flags() int        { return COMMAND_FLAG_WRITE }
 func (cmd *CommandSave) ResponseType() int { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandSave) Help() string      { return "TODO" }
 func (cmd *CommandSave) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {

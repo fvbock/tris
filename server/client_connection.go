@@ -6,10 +6,8 @@ import (
 )
 
 type ClientConnection struct {
-	Id  []byte
-	Msg []byte
-	// ActiveDbName string
-	// ActiveDb     *trie.RefCountTrie
+	Id           []byte
+	Msg          []byte
 	ActiveDb     *Database
 	ShowExecTime bool
 }
@@ -20,8 +18,7 @@ func (c *ClientConnection) String() string {
 
 func NewClientConnection(s *Server, id []byte) *ClientConnection {
 	return &ClientConnection{
-		Id: id,
-		// ActiveDbName: DEFAULT_DB,
+		Id:           id,
 		ActiveDb:     s.Databases[DEFAULT_DB],
 		ShowExecTime: false,
 	}
