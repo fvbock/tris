@@ -18,6 +18,8 @@ func init() {
 		Port:              6000,
 		DataDir:           "/home/morpheus/tris_data",
 		StorageFilePrefix: "trie_",
+		PersistOpsLimit:   100,
+		PersistInterval:   300 * time.Second,
 	}
 }
 

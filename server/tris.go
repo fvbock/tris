@@ -25,10 +25,11 @@ const (
 
 type Server struct {
 	sync.RWMutex
-	Log              *log.Logger
-	Config           *ServerConfig
-	Commands         map[string]Command
-	Databases        map[string]*trie.RefCountTrie
+	Log      *log.Logger
+	Config   *ServerConfig
+	Commands map[string]Command
+	// Databases        map[string]*trie.RefCountTrie
+	Databases        map[string]*Database
 	DatabaseOpCount  map[string]int
 	State            int
 	Stateswitch      chan int
@@ -52,8 +53,9 @@ func NewServer(config *ServerConfig) (s *Server, err error) {
 	s = &Server{
 		Config: config,
 		// server
-		Commands:          make(map[string]Command),
-		Databases:         make(map[string]*trie.RefCountTrie),
+		Commands: make(map[string]Command),
+		// Databases:         make(map[string]*trie.RefCountTrie),
+		Databases:         make(map[string]*Database),
 		Stateswitch:       make(chan int, 1),
 		CycleLength:       int64(time.Microsecond) * 500,
 		CheckStateChange:  time.Second * 1,
@@ -113,19 +115,29 @@ func (s *Server) Initialize() {
 		}
 	}
 	waitLoadDataFiles.Wait()
-	s.Databases[DEFAULT_DB] = trie.NewRefCountTrie()
+	s.NewDatabase(DEFAULT_DB)
+}
+
+func (s *Server) NewDatabase(name string) {
+	s.Databases[name] = &Database{
+		Name:                name,
+		Db:                  trie.NewRefCountTrie(),
+		OpsCount:            0,
+		LastPersistOpsCount: 0,
+		PersistOpsLimit:     s.Config.PersistOpsLimit,
+		PersistInterval:     s.Config.PersistInterval,
+	}
 }
 
 func (s *Server) loadDataFile(fname string) (err error) {
 	if len(fname) > len(s.Config.StorageFilePrefix) && fname[0:len(s.Config.StorageFilePrefix)] == s.Config.StorageFilePrefix {
 		id := strings.Split(fname, s.Config.StorageFilePrefix)[1]
 		s.Log.Printf("Loading Trie %s\n", id)
-		var tr *trie.RefCountTrie
-		tr, err = trie.RCTLoadFromFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, id))
+		s.NewDatabase(id)
+		s.Databases[id].Db, err = trie.RCTLoadFromFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, id))
 		if err != nil {
 			return
 		}
-		s.Databases[id] = tr
 	} else {
 		err = errors.New("")
 	}

@@ -13,7 +13,7 @@ type ServerConfig struct {
 	DataDir           string
 	StorageFilePrefix string
 
-	// persistance intervals on a per db basis
+	// persistance interval defaults
 	PersistInterval time.Duration
 	PersistOpsLimit int
 
