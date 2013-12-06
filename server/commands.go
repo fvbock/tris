@@ -8,11 +8,35 @@ import (
 	"strconv"
 )
 
+const (
+	COMMAND_FLAG_READ  = 1
+	COMMAND_FLAG_WRITE = 2
+	COMMAND_FLAG_ADMIN = 4
+
+	COMMAND_REPLY_EMPTY  = 0
+	COMMAND_REPLY_SINGLE = 1
+	COMMAND_REPLY_MULTI  = 2
+	COMMAND_REPLY_NONE   = 3
+
+	COMMAND_OK   = 0
+	COMMAND_FAIL = 1
+)
+
 var (
 	TrisCommands []Command
 )
 
-func init() {
+/*
+Server command interface:
+
+Name() will return the name by which the command is identified in the servers command table
+Function() will be the actual function executed by calling the command. all functions get the Server and executing ClientConnection passed as pointers.
+*/
+type Command interface {
+	Name() string
+	Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply)
+	Flags() int
+	ResponseType() int
 }
 
 // make those "singletons"?
@@ -25,7 +49,7 @@ type CommandInfo struct{}
 func (cmd *CommandInfo) Name() string      { return "INFO" }
 func (cmd *CommandInfo) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandInfo) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandInfo) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandInfo) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	var dbNames string
 	var n int = 1
 	for name, _ := range s.Databases {
@@ -61,7 +85,7 @@ type CommandDbInfo struct{}
 func (cmd *CommandDbInfo) Name() string      { return "DBINFO" }
 func (cmd *CommandDbInfo) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandDbInfo) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandDbInfo) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandDbInfo) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	dbInfo := fmt.Sprintf(`DBINFO for database %s:
  OpsCount: %v
  DumpOpsCount: %v
@@ -80,7 +104,7 @@ type CommandExit struct{}
 func (cmd *CommandExit) Name() string      { return "EXIT" }
 func (cmd *CommandExit) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandExit) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandExit) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandExit) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// delete(s.ActiveClients, string(c.Id))
 	s.InactiveClientIds <- string(c.Id)
 	reply = NewReply([][]byte{[]byte("")}, COMMAND_OK)
@@ -95,7 +119,7 @@ type CommandPing struct{}
 func (cmd *CommandPing) Name() string      { return "PING" }
 func (cmd *CommandPing) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandPing) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandPing) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandPing) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	reply = NewReply([][]byte{[]byte("0")}, COMMAND_OK)
 	return
 }
@@ -108,7 +132,7 @@ type CommandSelect struct{}
 func (cmd *CommandSelect) Name() string      { return "SELECT" }
 func (cmd *CommandSelect) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandSelect) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandSelect) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandSelect) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// name := string(args[0].([]byte))
 	name := args[0].(string)
 	if !s.dbExists(name) {
@@ -128,7 +152,7 @@ type CommandCreateTrie struct{}
 func (cmd *CommandCreateTrie) Name() string      { return "CREATE" }
 func (cmd *CommandCreateTrie) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
 func (cmd *CommandCreateTrie) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandCreateTrie) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandCreateTrie) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// name := string(args[0].([]byte))
 	name := args[0].(string)
 	s.Lock()
@@ -155,7 +179,7 @@ type CommandAdd struct{}
 func (cmd *CommandAdd) Name() string      { return "ADD" }
 func (cmd *CommandAdd) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
 func (cmd *CommandAdd) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandAdd) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandAdd) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// key := string(args[0].([]byte))
 	key := args[0].(string)
 	b := c.ActiveDb.Add(key)
@@ -170,7 +194,7 @@ type CommandDel struct{}
 func (cmd *CommandDel) Name() string      { return "DEL" }
 func (cmd *CommandDel) Flags() int        { return COMMAND_FLAG_ADMIN | COMMAND_FLAG_WRITE }
 func (cmd *CommandDel) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandDel) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandDel) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// key := string(args[0].([]byte))
 	key := args[0].(string)
 	if c.ActiveDb.Delete(key) {
@@ -187,7 +211,7 @@ type CommandHas struct{}
 func (cmd *CommandHas) Name() string      { return "HAS" }
 func (cmd *CommandHas) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandHas) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandHas) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandHas) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// key := string(args[0].([]byte))
 	key := args[0].(string)
 	if c.ActiveDb.Has(key) {
@@ -204,7 +228,7 @@ type CommandHasCount struct{}
 func (cmd *CommandHasCount) Name() string      { return "HASCOUNT" }
 func (cmd *CommandHasCount) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandHasCount) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandHasCount) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandHasCount) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// key := string(args[0].([]byte))
 	key := args[0].(string)
 	has, count := c.ActiveDb.HasCount(key)
@@ -220,7 +244,7 @@ type CommandHasPrefix struct{}
 func (cmd *CommandHasPrefix) Name() string      { return "HASPREFIX" }
 func (cmd *CommandHasPrefix) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandHasPrefix) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandHasPrefix) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandHasPrefix) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// key := string(args[0].([]byte))
 	key := args[0].(string)
 	if c.ActiveDb.HasPrefix(key) {
@@ -237,7 +261,7 @@ type CommandTree struct{}
 func (cmd *CommandTree) Name() string      { return "TREE" }
 func (cmd *CommandTree) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandTree) ResponseType() int { return COMMAND_REPLY_SINGLE }
-func (cmd *CommandTree) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandTree) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	return NewReply([][]byte{[]byte(c.ActiveDb.Dump())}, COMMAND_OK)
 }
 
@@ -249,7 +273,7 @@ type CommandMembers struct{}
 func (cmd *CommandMembers) Name() string      { return "MEMBERS" }
 func (cmd *CommandMembers) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandMembers) ResponseType() int { return COMMAND_REPLY_MULTI }
-func (cmd *CommandMembers) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandMembers) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	var mrep [][]byte
 	for _, m := range c.ActiveDb.Members() {
 		mrep = append(mrep, []byte(m.Value))
@@ -266,7 +290,7 @@ type CommandPrefixMembers struct{}
 func (cmd *CommandPrefixMembers) Name() string      { return "PREFIXMEMBERS" }
 func (cmd *CommandPrefixMembers) Flags() int        { return COMMAND_FLAG_READ }
 func (cmd *CommandPrefixMembers) ResponseType() int { return COMMAND_REPLY_MULTI }
-func (cmd *CommandPrefixMembers) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandPrefixMembers) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// key := string(args[0].([]byte))
 	key := args[0].(string)
 	var mrep [][]byte
@@ -285,7 +309,7 @@ type CommandTiming struct{}
 func (cmd *CommandTiming) Name() string      { return "TIMING" }
 func (cmd *CommandTiming) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandTiming) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandTiming) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandTiming) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	if c.ShowExecTime {
 		c.ShowExecTime = false
 	} else {
@@ -302,7 +326,7 @@ type CommandImportDb struct{}
 func (cmd *CommandImportDb) Name() string      { return "IMPORT" }
 func (cmd *CommandImportDb) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandImportDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandImportDb) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandImportDb) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	filename := args[0].(string)
 	dbname := args[1].(string)
 	s.Lock()
@@ -343,7 +367,7 @@ type CommandMergeDb struct{}
 func (cmd *CommandMergeDb) Name() string      { return "MERGE" }
 func (cmd *CommandMergeDb) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandMergeDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandMergeDb) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandMergeDb) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	filename := args[0].(string)
 	err := c.ActiveDb.RCTMergeFromFile(filename)
 	if err != nil {
@@ -370,7 +394,7 @@ type CommandSave struct{}
 func (cmd *CommandSave) Name() string      { return "SAVE" }
 func (cmd *CommandSave) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandSave) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandSave) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandSave) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	if c.ActiveDbName == DEFAULT_DB {
 		err := fmt.Sprintf("Manually saving the default DB is not permitted.")
 		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL)
@@ -423,7 +447,7 @@ type CommandShutdown struct{}
 func (cmd *CommandShutdown) Name() string      { return "SHUTDOWN" }
 func (cmd *CommandShutdown) Flags() int        { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandShutdown) ResponseType() int { return COMMAND_REPLY_EMPTY }
-func (cmd *CommandShutdown) Function(s *Server, c *Client, args ...interface{}) (reply *Reply) {
+func (cmd *CommandShutdown) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	s.Stop()
 	return NewReply([][]byte{}, COMMAND_OK)
 }

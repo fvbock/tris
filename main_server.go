@@ -22,7 +22,7 @@ func init() {
 }
 
 func main() {
-	server, err := tris.New(config)
+	server, err := tris.NewServer(config)
 	if err != nil {
 		server.Log.Printf("Could not initialize server: %v\n", err)
 	}

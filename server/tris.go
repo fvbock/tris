@@ -15,68 +15,12 @@ import (
 )
 
 const (
-	VERSION = "0.0.2"
-
+	VERSION    = "0.0.2"
 	DEFAULT_DB = "0"
-)
 
-func init() {
-}
-
-type Client struct {
-	Id           []byte
-	Msg          []byte
-	ActiveDbName string
-	ActiveDb     *trie.RefCountTrie
-	ShowExecTime bool
-	// Cmds         []Command
-	// Args         [][]interface{}
-	// Response     []byte
-}
-
-func (c *Client) String() string {
-	return fmt.Sprintf("Client ID: %v\nActive Db: %v\n", c.Id, c.ActiveDbName)
-}
-
-func NewClient(s *Server, id []byte) *Client {
-	return &Client{
-		Id:           id,
-		ActiveDbName: DEFAULT_DB,
-		ActiveDb:     s.Databases[DEFAULT_DB],
-		ShowExecTime: false,
-	}
-}
-
-type Command interface {
-	Name() string
-	Function(s *Server, c *Client, args ...interface{}) (reply *Reply)
-	Flags() int
-	ResponseType() int
-}
-
-type Database struct {
-	Name string
-	Db   *trie.RefCountTrie
-}
-
-// TODO: move persisting into the Database struct
-
-const (
 	STATE_STOP    = 1
 	STATE_STOPPED = 2
 	STATE_RUNNING = 3
-
-	COMMAND_FLAG_READ  = 1
-	COMMAND_FLAG_WRITE = 2
-	COMMAND_FLAG_ADMIN = 4
-
-	COMMAND_REPLY_EMPTY  = 0
-	COMMAND_REPLY_SINGLE = 1
-	COMMAND_REPLY_MULTI  = 2
-	COMMAND_REPLY_NONE   = 3
-
-	COMMAND_OK   = 0
-	COMMAND_FAIL = 1
 )
 
 type Server struct {
@@ -97,14 +41,14 @@ type Server struct {
 	Socket    *zmq.Socket
 	pollItems zmq.PollItems
 
-	// CommandQueue  chan *Client
-	ActiveClients     map[string]*Client
+	// CommandQueue  chan *ClientConnection
+	ActiveClients     map[string]*ClientConnection
 	InactiveClientIds chan string
 	RequestsRunning   int
 	CommandsProcessed int
 }
 
-func New(config *ServerConfig) (s *Server, err error) {
+func NewServer(config *ServerConfig) (s *Server, err error) {
 	s = &Server{
 		Config: config,
 		// server
@@ -113,7 +57,7 @@ func New(config *ServerConfig) (s *Server, err error) {
 		Stateswitch:       make(chan int, 1),
 		CycleLength:       int64(time.Microsecond) * 500,
 		CheckStateChange:  time.Second * 1,
-		ActiveClients:     make(map[string]*Client),
+		ActiveClients:     make(map[string]*ClientConnection),
 		InactiveClientIds: make(chan string),
 		Log:               log.New(os.Stderr, "", log.LstdFlags),
 		// stats
@@ -147,7 +91,7 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandTree{})
 	TrisCommands = append(TrisCommands, &CommandTiming{})
 	TrisCommands = append(TrisCommands, &CommandShutdown{})
-	s.RegisterCommands(TrisCommands...)
+	s.registerCommands(TrisCommands...)
 
 	//
 
@@ -155,15 +99,20 @@ func (s *Server) Initialize() {
 	if err != nil {
 
 	}
+	waitLoadDataFiles := sync.WaitGroup{}
 	for _, f := range dataFiles {
 		if !f.IsDir() {
-			err := s.loadDataFile(f.Name())
-			if err != nil {
-				s.Log.Printf("Error loading trie file %s: %v\n", f.Name(), err)
-			}
+			waitLoadDataFiles.Add(1)
+			go func(datafile os.FileInfo) {
+				err := s.loadDataFile(datafile.Name())
+				if err != nil {
+					s.Log.Printf("Error loading trie file %s: %v\n", f.Name(), err)
+				}
+				waitLoadDataFiles.Done()
+			}(f)
 		}
 	}
-
+	waitLoadDataFiles.Wait()
 	s.Databases[DEFAULT_DB] = trie.NewRefCountTrie()
 }
 
@@ -179,18 +128,6 @@ func (s *Server) loadDataFile(fname string) (err error) {
 		s.Databases[id] = tr
 	} else {
 		err = errors.New("")
-	}
-	return
-}
-
-func (s *Server) RegisterCommands(cmds ...Command) (err error) {
-	for _, c := range cmds {
-		if _, exists := s.Commands[c.Name()]; exists {
-			err = errors.New(fmt.Sprintf("Command %s has already been registered.", c.Name()))
-			return
-		}
-		// s.Log.Println("Registering command", c.Name())
-		s.Commands[c.Name()] = c
 	}
 	return
 }
@@ -236,7 +173,7 @@ func (s *Server) Start() (err error) {
 				msgParts, _ := s.pollItems[0].Socket.RecvMultipart(0)
 				s.RequestsRunning++
 				s.Unlock()
-				go s.HandleRequest(msgParts)
+				go s.handleRequest(msgParts)
 			default:
 				select {
 				case <-stateTicker:
@@ -287,38 +224,12 @@ beforeSleepCycle:
 	return
 }
 
-func (s *Server) dbExists(name string) bool {
-	if _, exists := s.Databases[name]; !exists {
-		return false
-	}
-	return true
-}
-
-func splitMsgs(payload []byte) (cmds []string, args [][]interface{}, err error) {
-	msgs := bytes.Split(bytes.Trim(payload, " "), []byte("\n"))
-	for n, msg := range msgs {
-		parts := bytes.Split(bytes.Trim(msg, " "), []byte(" "))
-		for i, p := range parts {
-			if len(p) == 0 {
-				continue
-			}
-			if i == 0 {
-				cmds = append(cmds, string(p))
-				args = append(args, make([]interface{}, 0))
-			} else {
-				args[n] = append(args[n], string(p))
-			}
-		}
-	}
-	return
-}
-
-func (s *Server) HandleRequest(msgParts [][]byte) {
+func (s *Server) handleRequest(msgParts [][]byte) {
 	clientKey := string(msgParts[0])
-	var c *Client
+	var c *ClientConnection
 	var unknown bool
 	if c, unknown = s.ActiveClients[clientKey]; !unknown {
-		s.ActiveClients[clientKey] = NewClient(s, msgParts[0])
+		s.ActiveClients[clientKey] = NewClientConnection(s, msgParts[0])
 		c = s.ActiveClients[clientKey]
 	}
 	var execStart time.Time
@@ -395,4 +306,42 @@ func (s *Server) shutdown() {
 	s.Log.Println("Context closed.")
 	s.Log.Println("Stopped server.")
 	os.Exit(0)
+}
+
+func (s *Server) registerCommands(cmds ...Command) (err error) {
+	for _, c := range cmds {
+		if _, exists := s.Commands[c.Name()]; exists {
+			err = errors.New(fmt.Sprintf("Command %s has already been registered.", c.Name()))
+			return
+		}
+		// s.Log.Println("Registering command", c.Name())
+		s.Commands[c.Name()] = c
+	}
+	return
+}
+
+func (s *Server) dbExists(name string) bool {
+	if _, exists := s.Databases[name]; !exists {
+		return false
+	}
+	return true
+}
+
+func splitMsgs(payload []byte) (cmds []string, args [][]interface{}, err error) {
+	msgs := bytes.Split(bytes.Trim(payload, " "), []byte("\n"))
+	for n, msg := range msgs {
+		parts := bytes.Split(bytes.Trim(msg, " "), []byte(" "))
+		for i, p := range parts {
+			if len(p) == 0 {
+				continue
+			}
+			if i == 0 {
+				cmds = append(cmds, string(p))
+				args = append(args, make([]interface{}, 0))
+			} else {
+				args[n] = append(args[n], string(p))
+			}
+		}
+	}
+	return
 }
