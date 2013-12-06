@@ -175,7 +175,9 @@ func (s *Server) Start() (err error) {
 
 			// make the poller run in a sep goroutine and push to a channel?
 			if s.RequestsRunning > 0 {
+				s.Lock()
 				_, _ = zmq.Poll(s.pollItems, 1)
+				s.Unlock()
 			} else {
 				_, _ = zmq.Poll(s.pollItems, 1000000)
 			}
