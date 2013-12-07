@@ -9,10 +9,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	// "os/signal"
+	"os/signal"
 	"strings"
 	"sync"
-	// "syscall"
+	"syscall"
 	"time"
 )
 
@@ -149,15 +149,14 @@ func (s *Server) Start() (err error) {
 	go func(s *Server) {
 		s.Log.Println("Starting server...")
 
-		// // setup signal handling
-		// sigChan := make(chan os.Signal, 1)
-		// signal.Notify(sigChan,
-		// 	syscall.SIGTERM,
-		// 	syscall.SIGINT,
-		// 	syscall.SIGKILL,
-		// 	syscall.SIGQUIT,
-		// 	syscall.SIGHUP,
-		// )
+		// setup signal handling
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan,
+			syscall.SIGTERM,
+			syscall.SIGINT,
+			syscall.SIGKILL,
+			syscall.SIGHUP,
+		)
 
 		// zmq
 		s.Context, err = zmq.NewContext()
@@ -190,8 +189,10 @@ func (s *Server) Start() (err error) {
 				s.Lock()
 				_, _ = zmq.Poll(s.pollItems, 1)
 				s.Unlock()
+				s.Log.Println(">>>")
 			} else {
 				_, _ = zmq.Poll(s.pollItems, time.Second*1)
+				s.Log.Println(".")
 			}
 			switch {
 			case s.pollItems[0].REvents&zmq.POLLIN != 0:
@@ -212,10 +213,24 @@ func (s *Server) Start() (err error) {
 						if s.State == STATE_RUNNING {
 						}
 					default:
-						time.Sleep(1)
+						// time.Sleep(1)
 					}
-				// case sig := <-sigChan:
-				// 	s.Log.Println("got signal:", sig)
+				case sig := <-sigChan:
+					s.Log.Println("got signal:", sig)
+					switch sig {
+					case syscall.SIGHUP:
+						s.Log.Println("got SIGHUP")
+						s.Stop()
+					case syscall.SIGINT:
+						s.Log.Println("got SIGINT")
+						s.Stop()
+					case syscall.SIGTERM:
+						s.Log.Println("got SIGTERM")
+						s.Stop()
+					case syscall.SIGKILL:
+						s.Log.Println("got SIGKILL")
+						s.Stop()
+					}
 				default:
 					// s.Log.Println(".")
 				}
@@ -314,7 +329,6 @@ func (s *Server) handleRequest(msgParts [][]byte) {
 	if c.ShowExecTime {
 		s.Log.Printf("%s %v took %v\n", cmds, args, time.Since(execStart))
 	}
-	// TODO: count db write operations
 }
 
 func (s *Server) Stop() {
