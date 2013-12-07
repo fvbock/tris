@@ -103,7 +103,9 @@ func (cmd *CommandDbInfo) Function(s *Server, c *ClientConnection, args ...inter
  OpsCount: %v
  LastPersistOpsCount: %v
  PersistOpsLimit: %v
-`, c.ActiveDb.Name, c.ActiveDb.OpsCount, c.ActiveDb.LastPersistOpsCount, c.ActiveDb.PersistOpsLimit)
+ LastPersistTime: %v
+ PersistInterval: %v
+`, c.ActiveDb.Name, c.ActiveDb.OpsCount, c.ActiveDb.LastPersistOpsCount, c.ActiveDb.PersistOpsLimit, c.ActiveDb.LastPersistTime, c.ActiveDb.PersistInterval)
 
 	reply = NewReply([][]byte{[]byte(dbInfo)}, COMMAND_OK)
 	return

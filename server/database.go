@@ -6,35 +6,42 @@ import (
 	"github.com/fvbock/trie"
 	"github.com/fvbock/tris/util"
 	"os"
+	"sync"
 	"time"
 )
 
 type Database struct {
+	sync.RWMutex
 	Name                string
 	Db                  *trie.RefCountTrie
 	OpsCount            int
 	LastPersistOpsCount int
 	PersistOpsLimit     int
-	LastPersistTime     time.Time
+	LastPersistTime     int64
 	PersistInterval     time.Duration
+	PersistTicker       time.Ticker
 }
 
-// TODO: move persisting into the Database struct
-
 func (d *Database) Persist(fname string) (err error) {
+	if d.LastPersistOpsCount == d.OpsCount {
+		return
+	}
 	err = d.Db.DumpToFile(fname)
 	if err != nil {
 		err = errors.New(fmt.Sprintf("Could persist the db %s: %v", d.Name, err))
+	} else {
+		d.Lock()
+		d.LastPersistOpsCount = d.OpsCount
+		d.LastPersistTime = time.Now().UnixNano()
+		d.Unlock()
 	}
 	return
 }
 
-// TODO
 func (d *Database) OpsLimitPersist(fname string) (err error) {
-	// err = d.Db.DumpToFile(fname)
-	// if err != nil {
-	// 	err = errors.New(fmt.Sprintf("Could persist the db %s: %v", d.Name, err))
-	// }
+	if d.LastPersistOpsCount+d.PersistOpsLimit >= d.OpsCount {
+		err = d.Persist(fname)
+	}
 	return
 }
 

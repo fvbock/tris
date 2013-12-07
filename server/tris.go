@@ -25,10 +25,9 @@ const (
 
 type Server struct {
 	sync.RWMutex
-	Log      *log.Logger
-	Config   *ServerConfig
-	Commands map[string]Command
-	// Databases        map[string]*trie.RefCountTrie
+	Log              *log.Logger
+	Config           *ServerConfig
+	Commands         map[string]Command
 	Databases        map[string]*Database
 	DatabaseOpCount  map[string]int
 	State            int
@@ -53,8 +52,7 @@ func NewServer(config *ServerConfig) (s *Server, err error) {
 	s = &Server{
 		Config: config,
 		// server
-		Commands: make(map[string]Command),
-		// Databases:         make(map[string]*trie.RefCountTrie),
+		Commands:          make(map[string]Command),
 		Databases:         make(map[string]*Database),
 		Stateswitch:       make(chan int, 1),
 		CycleLength:       int64(time.Microsecond) * 500,
@@ -271,6 +269,13 @@ func (s *Server) handleRequest(msgParts [][]byte) {
 			if reply.ReturnCode != COMMAND_OK {
 				s.Log.Println(string(reply.Payload[0]))
 			}
+			// do this even when we fail...?
+			if COMMAND_FLAG_WRITE&s.Commands[cmdName].Flags() == COMMAND_FLAG_WRITE {
+				s.Log.Println("WRITE cmd +1")
+				c.ActiveDb.Lock()
+				c.ActiveDb.OpsCount += 1
+				c.ActiveDb.Unlock()
+			}
 		}
 		replies = append(replies, reply)
 		s.Lock()
@@ -310,6 +315,15 @@ func (s *Server) prepareShutdown() {
 		s.Log.Println("Requests running:", s.RequestsRunning)
 		time.Sleep(100 * time.Millisecond)
 	}
+	waitPersist := sync.WaitGroup{}
+	for _, db := range s.Databases {
+		waitPersist.Add(1)
+		go func(d *Database) {
+			d.Persist(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, d.Name))
+			waitPersist.Done()
+		}(db)
+	}
+	waitPersist.Wait()
 }
 
 func (s *Server) shutdown() {
