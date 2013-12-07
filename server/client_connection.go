@@ -2,7 +2,6 @@ package tris
 
 import (
 	"fmt"
-	// "github.com/fvbock/trie"
 )
 
 type ClientConnection struct {

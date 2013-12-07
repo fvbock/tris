@@ -119,7 +119,7 @@ func (s *Server) Initialize() {
 func (s *Server) NewDatabase(name string) {
 	s.Databases[name] = &Database{
 		Name:                name,
-		Db:                  trie.NewRefCountTrie(),
+		Db:                  trie.NewTrie(),
 		OpsCount:            0,
 		LastPersistOpsCount: 0,
 		PersistOpsLimit:     s.Config.PersistOpsLimit,

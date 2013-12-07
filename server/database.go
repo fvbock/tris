@@ -13,7 +13,7 @@ import (
 type Database struct {
 	sync.RWMutex
 	Name                string
-	Db                  *trie.RefCountTrie
+	Db                  *trie.Trie
 	OpsCount            int
 	LastPersistOpsCount int
 	PersistOpsLimit     int

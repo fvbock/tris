@@ -162,7 +162,7 @@ func (cmd *CommandSelect) Function(s *Server, c *ClientConnection, args ...inter
 }
 
 /*
-CommandCreateTrie maps to trie.NewRefCountTrie()
+CommandCreateTrie maps to trie.Trie()
 */
 type CommandCreateTrie struct{}
 
@@ -190,7 +190,7 @@ func (cmd *CommandCreateTrie) Function(s *Server, c *ClientConnection, args ...i
 }
 
 /*
-CommandAdd maps to RefCountTrie.Add()
+CommandAdd maps to Trie.Add()
 */
 type CommandAdd struct{}
 
@@ -205,7 +205,7 @@ func (cmd *CommandAdd) Function(s *Server, c *ClientConnection, args ...interfac
 }
 
 /*
-CommandDel maps to RefCountTrie.Del()
+CommandDel maps to Trie.Del()
 */
 type CommandDel struct{}
 
@@ -222,7 +222,7 @@ func (cmd *CommandDel) Function(s *Server, c *ClientConnection, args ...interfac
 }
 
 /*
-CommandHas maps to RefCountTrie.Has()
+CommandHas maps to Trie.Has()
 */
 type CommandHas struct{}
 
@@ -239,7 +239,7 @@ func (cmd *CommandHas) Function(s *Server, c *ClientConnection, args ...interfac
 }
 
 /*
-CommandHasCount maps to RefCountTrie.HasCount()
+CommandHasCount maps to Trie.HasCount()
 */
 type CommandHasCount struct{}
 
@@ -254,7 +254,7 @@ func (cmd *CommandHasCount) Function(s *Server, c *ClientConnection, args ...int
 }
 
 /*
-CommandHasPrefix maps to RefCountTrie.HasPrefix()
+CommandHasPrefix maps to Trie.HasPrefix()
 */
 type CommandHasPrefix struct{}
 
@@ -271,7 +271,7 @@ func (cmd *CommandHasPrefix) Function(s *Server, c *ClientConnection, args ...in
 }
 
 /*
-CommandTree maps to RefCountTrie.Dump()
+CommandTree maps to Trie.Dump()
 */
 type CommandTree struct{}
 
@@ -284,7 +284,7 @@ func (cmd *CommandTree) Function(s *Server, c *ClientConnection, args ...interfa
 }
 
 /*
-CommandMembers maps to RefCountTrie.Members()
+CommandMembers maps to Trie.Members()
 */
 type CommandMembers struct{}
 
@@ -302,7 +302,7 @@ func (cmd *CommandMembers) Function(s *Server, c *ClientConnection, args ...inte
 }
 
 /*
-CommandPrefixMembers maps to RefCountTrie.PrefixMembers()
+CommandPrefixMembers maps to Trie.PrefixMembers()
 */
 type CommandPrefixMembers struct{}
 
