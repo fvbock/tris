@@ -12,7 +12,6 @@ import (
 const ()
 
 type Reply struct {
-	// buffer
 	Payload [][]byte
 	// Value    interface{}
 	ReturnCode int64

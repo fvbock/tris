@@ -9,8 +9,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	// "os/signal"
 	"strings"
 	"sync"
+	// "syscall"
 	"time"
 )
 
@@ -132,7 +134,7 @@ func (s *Server) loadDataFile(fname string) (err error) {
 		id := strings.Split(fname, s.Config.StorageFilePrefix)[1]
 		s.Log.Printf("Loading Trie %s\n", id)
 		s.NewDatabase(id)
-		s.Databases[id].Db, err = trie.RCTLoadFromFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, id))
+		s.Databases[id].Db, err = trie.LoadFromFile(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, id))
 		if err != nil {
 			return
 		}
@@ -146,6 +148,18 @@ func (s *Server) Start() (err error) {
 	s.Stateswitch <- STATE_RUNNING
 	go func(s *Server) {
 		s.Log.Println("Starting server...")
+
+		// // setup signal handling
+		// sigChan := make(chan os.Signal, 1)
+		// signal.Notify(sigChan,
+		// 	syscall.SIGTERM,
+		// 	syscall.SIGINT,
+		// 	syscall.SIGKILL,
+		// 	syscall.SIGQUIT,
+		// 	syscall.SIGHUP,
+		// )
+
+		// zmq
 		s.Context, err = zmq.NewContext()
 		if err != nil {
 
@@ -178,6 +192,7 @@ func (s *Server) Start() (err error) {
 				s.Unlock()
 			} else {
 				_, _ = zmq.Poll(s.pollItems, 1000000)
+				s.Log.Println(">")
 			}
 			switch {
 			case s.pollItems[0].REvents&zmq.POLLIN != 0:
@@ -200,6 +215,8 @@ func (s *Server) Start() (err error) {
 					default:
 						time.Sleep(1)
 					}
+				// case sig := <-sigChan:
+				// 	s.Log.Println("got signal:", sig)
 				default:
 					// s.Log.Println(".")
 				}

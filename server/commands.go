@@ -362,7 +362,7 @@ func (cmd *CommandImportDb) Function(s *Server, c *ClientConnection, args ...int
 	s.Databases[dbname].Db.Root.Lock()
 	defer s.Databases[dbname].Db.Root.Unlock()
 	var err error
-	s.Databases[dbname].Db, err = trie.RCTLoadFromFile(filename)
+	s.Databases[dbname].Db, err = trie.LoadFromFile(filename)
 	if err != nil {
 		err := fmt.Sprintf("Database import failed: %v", err)
 		s.Log.Println(err)
@@ -391,7 +391,7 @@ func (cmd *CommandMergeDb) ResponseType() int { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandMergeDb) Help() string      { return "TODO" }
 func (cmd *CommandMergeDb) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	filename := args[0].(string)
-	err := c.ActiveDb.Db.RCTMergeFromFile(filename)
+	err := c.ActiveDb.Db.MergeFromFile(filename)
 	if err != nil {
 		err := fmt.Sprintf("Database merge failed: %v", err)
 		s.Log.Println(err)
