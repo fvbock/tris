@@ -189,10 +189,8 @@ func (s *Server) Start() (err error) {
 				s.Lock()
 				_, _ = zmq.Poll(s.pollItems, 1)
 				s.Unlock()
-				s.Log.Println(">>>")
 			} else {
 				_, _ = zmq.Poll(s.pollItems, time.Second*1)
-				s.Log.Println(".")
 			}
 			switch {
 			case s.pollItems[0].REvents&zmq.POLLIN != 0:
