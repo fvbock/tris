@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	zmq "github.com/alecthomas/gozmq"
+	"github.com/fvbock/tris/server"
+	"log"
 )
 
 const (
@@ -87,4 +89,36 @@ func (c *Client) Send(msg string) (response []byte, err error) {
 	c.Socket.Send([]byte(msg+"\n"), 0)
 	response, err = c.Socket.Recv(0)
 	return
+}
+
+// func (c *Client) exec(cmd tris.Command, args ...string) {
+func (c *Client) exec(cmd tris.Command, args ...string) (response *tris.Reply, err error) {
+	msg := cmd.Name()
+	for _, arg := range args {
+		msg += " " + arg
+	}
+	r, err := c.Send(msg)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+	response = tris.Unserialize(r)
+	if response.ReturnCode != tris.COMMAND_OK {
+		log.Printf("FAILED:\ncmd: %s\nargs: %v\nresponse: %v\n", cmd, args, response)
+	} else {
+		log.Printf("cmd: %s\nargs: %v\nresponse: %v\n", cmd.Name(), args, response)
+	}
+	response.Print()
+	return
+}
+
+func (c *Client) Ping() {
+	c.exec(&tris.CommandPing{})
+}
+
+func (c *Client) Select(dbname string) {
+	c.exec(&tris.CommandSelect{}, dbname)
+}
+
+func (c *Client) DbInfo() {
+	c.exec(&tris.CommandDbInfo{})
 }
