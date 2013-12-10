@@ -292,7 +292,7 @@ func (s *Server) handleRequest(msgParts [][]byte) {
 			// handle non existing command call
 			reply = NewReply(
 				[][]byte{[]byte(fmt.Sprintf("Unknown Command %s.", cmd))},
-				COMMAND_FAIL)
+				COMMAND_FAIL, 1)
 		} else {
 			reply = s.Commands[cmdName].Function(s, c, args[i]...)
 			if reply.ReturnCode != COMMAND_OK {

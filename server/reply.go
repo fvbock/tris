@@ -15,7 +15,9 @@ type Reply struct {
 	Payload [][]byte
 	// Value    interface{}
 	ReturnCode int64
-	Type       int
+	Type       int64
+	Length     int64 // the nr of fields in one "reply row"
+	Signature  []int // the fields in one "reply row"
 }
 
 func (r *Reply) Print() {
@@ -36,6 +38,9 @@ func (r *Reply) Serialize() (ser []byte) {
 	rc := make([]byte, 1)
 	_ = binary.PutVarint(rc, r.ReturnCode)
 	ser = append(ser, rc...)
+	rl := make([]byte, 1)
+	_ = binary.PutVarint(rl, r.Length)
+	ser = append(ser, rl...)
 	for _, payload := range r.Payload {
 		pl := make([]byte, 4)
 		_ = binary.PutVarint(pl, int64(len(payload)))
@@ -55,8 +60,14 @@ func Unserialize(r []byte) *Reply {
 	if err != nil {
 		fmt.Println(err)
 	}
+	rl, _, err := tris.ReadVarint(buf)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("rc, rl", rc, rl)
 	reply := &Reply{
 		ReturnCode: rc,
+		Length:     rl,
 	}
 	for {
 		pLength, bl, err := tris.ReadVarint(buf)
@@ -80,10 +91,11 @@ func Unserialize(r []byte) *Reply {
 	return reply
 }
 
-func NewReply(payload [][]byte, returnCode int64) *Reply {
+func NewReply(payload [][]byte, returnCode int64, responseLength int64) *Reply {
 	return &Reply{
 		Payload:    payload,
 		ReturnCode: returnCode,
+		Length:     responseLength,
 	}
 }
 
