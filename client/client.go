@@ -122,3 +122,53 @@ func (c *Client) Select(dbname string) {
 func (c *Client) DbInfo() {
 	c.exec(&tris.CommandDbInfo{})
 }
+
+func (c *Client) Info() {
+	c.exec(&tris.CommandInfo{})
+}
+
+// TrisCommands = append(TrisCommands, &CommandExit{})
+
+func (c *Client) Save() {
+	c.exec(&tris.CommandSave{})
+}
+
+// TrisCommands = append(TrisCommands, &CommandSave{})
+// TrisCommands = append(TrisCommands, &CommandImportDb{})
+// TrisCommands = append(TrisCommands, &CommandMergeDb{})
+
+func (c *Client) Create(dbname string) {
+	c.exec(&tris.CommandCreateTrie{}, dbname)
+}
+
+func (c *Client) Add(key string) {
+	c.exec(&tris.CommandAdd{}, key)
+}
+
+func (c *Client) Del(key string) {
+	c.exec(&tris.CommandDel{}, key)
+}
+
+func (c *Client) Has(key string) {
+	c.exec(&tris.CommandHas{}, key)
+}
+
+func (c *Client) HasCount(key string) {
+	c.exec(&tris.CommandHasCount{}, key)
+}
+
+func (c *Client) HasPrefix(key string) {
+	c.exec(&tris.CommandHasPrefix{}, key)
+}
+
+func (c *Client) Members() {
+	c.exec(&tris.CommandMembers{})
+}
+
+func (c *Client) PrefixMembers(key string) {
+	c.exec(&tris.CommandPrefixMembers{}, key)
+}
+
+// TrisCommands = append(TrisCommands, &CommandTree{})
+// TrisCommands = append(TrisCommands, &CommandTiming{})
+// TrisCommands = append(TrisCommands, &CommandShutdown{})
