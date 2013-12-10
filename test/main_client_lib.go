@@ -33,6 +33,23 @@ func main() {
 	client.Ping()
 	client.Select("foo")
 	client.DbInfo()
+
+	client.Has("foo")
+	client.Has("food")
+
+	client.HasCount("foo")
+	client.HasCount("food")
+
+	client.HasPrefix("foo")
+	client.HasPrefix("food")
+
+	client.Members()
+	client.PrefixMembers("foo")
+
+	client.Add("food")
+	client.Add("food")
+	client.Del("food")
+
 	// // check conn
 	// r, err := client.Send("PING")
 	// if err != nil {
