@@ -146,7 +146,8 @@ func (s *Server) loadDataFile(fname string) (err error) {
 
 func (s *Server) Start() (err error) {
 	s.Stateswitch <- STATE_RUNNING
-	go func(s *Server) {
+	s.Log.Println("Server starting...")
+	func(s *Server) {
 		s.Log.Println("Starting server...")
 
 		// setup signal handling
@@ -245,7 +246,6 @@ func (s *Server) Start() (err error) {
 		s.State = STATE_STOPPED
 		s.shutdown()
 	}(s)
-	s.Log.Println("Server starting...")
 	return
 }
 

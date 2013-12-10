@@ -28,10 +28,7 @@ func main() {
 	if err != nil {
 		server.Log.Printf("Could not initialize server: %v\n", err)
 	}
-	server.Start()
+	server.Start() // Blocks until the server Stop()s
 
-	server.Log.Println("Wait for 10 min")
-	time.Sleep(1000 * time.Second)
-	server.Stop()
 	server.Log.Println("Done")
 }
