@@ -21,6 +21,10 @@ type DSN struct {
 	Port     int
 }
 
+// type ClientCommand interface{
+
+// }
+
 /*
 Client
 */
@@ -31,22 +35,16 @@ type Client struct {
 	connected bool
 	ActiveDb  string
 	SessionId string
+	// Commands map[string]ClientCommand
 }
 
-func NewClient(dsn *DSN, ctx *zmq.Context) (c *Client, err error) {
+func NewClient(dsn *DSN) (c *Client, err error) {
 	c = &Client{
 		Dsn:       dsn,
+		Context:   TrisClientZmqContext,
 		connected: false,
 	}
-	if ctx != nil {
-		c.Context = ctx
-	} else {
-		c.Context, err = zmq.NewContext()
-		if err != nil {
-			err = errors.New(fmt.Sprintf("Cannot initialize Context:%v\n", err))
-			return
-		}
-	}
+
 	return
 }
 
@@ -107,66 +105,92 @@ func (c *Client) exec(cmd tris.Command, args ...string) (response *tris.Reply, e
 	} else {
 		log.Printf("cmd: %s\nargs: %v\nresponse: %v\n", cmd.Name(), args, response)
 	}
-	response.Print()
+	// response.Print()
 	return
 }
 
-func (c *Client) Ping() {
-	c.exec(&tris.CommandPing{})
+func (c *Client) Ping() (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandPing{})
+	if r.ReturnCode != tris.COMMAND_OK || err != nil {
+		// ???
+	}
+	return
 }
 
-func (c *Client) Select(dbname string) {
-	c.exec(&tris.CommandSelect{}, dbname)
+func (c *Client) Select(dbname string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandSelect{}, dbname)
+	if r.ReturnCode != tris.COMMAND_OK || err != nil {
+		// TODO
+	}
+	c.ActiveDb = dbname
+	return
 }
 
-func (c *Client) DbInfo() {
-	c.exec(&tris.CommandDbInfo{})
+func (c *Client) DbInfo() (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandDbInfo{})
+	return
 }
 
-func (c *Client) Info() {
-	c.exec(&tris.CommandInfo{})
+func (c *Client) Info() (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandInfo{})
+	return
 }
 
 // TrisCommands = append(TrisCommands, &CommandExit{})
 
-func (c *Client) Save() {
-	c.exec(&tris.CommandSave{})
+func (c *Client) Save() (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandSave{})
+	return
 }
 
-// TrisCommands = append(TrisCommands, &CommandSave{})
-// TrisCommands = append(TrisCommands, &CommandImportDb{})
-// TrisCommands = append(TrisCommands, &CommandMergeDb{})
-
-func (c *Client) Create(dbname string) {
-	c.exec(&tris.CommandCreateTrie{}, dbname)
+func (c *Client) ImportDb(fname string, dbname string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandImportDb{}, fname, dbname)
+	return
 }
 
-func (c *Client) Add(key string) {
-	c.exec(&tris.CommandAdd{}, key)
+func (c *Client) MergeDb(fname string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandMergeDb{}, fname)
+	return
 }
 
-func (c *Client) Del(key string) {
-	c.exec(&tris.CommandDel{}, key)
+func (c *Client) Create(dbname string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandCreateTrie{}, dbname)
+	return
 }
 
-func (c *Client) Has(key string) {
-	c.exec(&tris.CommandHas{}, key)
+func (c *Client) Add(key string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandAdd{}, key)
+	return
 }
 
-func (c *Client) HasCount(key string) {
-	c.exec(&tris.CommandHasCount{}, key)
+func (c *Client) Del(key string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandDel{}, key)
+	return
 }
 
-func (c *Client) HasPrefix(key string) {
-	c.exec(&tris.CommandHasPrefix{}, key)
+func (c *Client) Has(key string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandHas{}, key)
+	return
 }
 
-func (c *Client) Members() {
-	c.exec(&tris.CommandMembers{})
+func (c *Client) HasCount(key string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandHasCount{}, key)
+	return
 }
 
-func (c *Client) PrefixMembers(key string) {
-	c.exec(&tris.CommandPrefixMembers{}, key)
+func (c *Client) HasPrefix(key string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandHasPrefix{}, key)
+	return
+}
+
+func (c *Client) Members() (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandMembers{})
+	return
+}
+
+func (c *Client) PrefixMembers(key string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandPrefixMembers{}, key)
+	return
 }
 
 // TrisCommands = append(TrisCommands, &CommandTree{})

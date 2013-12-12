@@ -1,8 +1,7 @@
 package main
 
 import (
-	// "fmt"
-	zmq "github.com/alecthomas/gozmq"
+	"fmt"
 	"github.com/fvbock/tris/client"
 	// "github.com/fvbock/tris/server"
 	// "log"
@@ -12,7 +11,7 @@ import (
 )
 
 func init() {
-	runtime.GOMAXPROCS(4)
+	runtime.GOMAXPROCS(2)
 }
 
 func main() {
@@ -21,14 +20,21 @@ func main() {
 		Host:     "127.0.0.1",
 		Port:     6000,
 	}
-	ctx, _ := zmq.NewContext()
 
-	// todo: use a pool
-	// client, err := pool.Get()
-	client, _ := tris.NewClient(dsn, ctx)
-	client.Dial()
-	// todo: defer pool.Put(client)
-	defer client.Close()
+	pool, err := tris.NewTrisConnectionPool(dsn, 10)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to init connection pool: %v", err))
+	}
+
+	client, err := pool.Get()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get pool connection: %v", err))
+	}
+	defer pool.Put(client)
+
+	// client, _ := tris.NewClient(dsn)
+	// client.Dial()
+	// defer client.Close()
 
 	client.Ping()
 	client.Select("foo")
