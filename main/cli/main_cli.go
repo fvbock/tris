@@ -8,6 +8,7 @@ import (
 	trisserver "github.com/fvbock/tris/server"
 	"github.com/sbinet/liner"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
@@ -126,6 +127,17 @@ func main() {
 				continue
 			}
 
+			// SOURCE cmd. read script file
+			if strings.ToUpper(command[:6]) == "SOURCE" {
+				fname := strings.Trim(command[6:], " \n")
+				fmt.Println("OPEN source file:", fname)
+				sourcedFile, err := ioutil.ReadFile(fname)
+				if err != nil {
+					fmt.Println("ERR opening source file:", err)
+					continue
+				}
+				command = string(sourcedFile)
+			}
 			// // nama
 			// r, err := client.Send(command)
 			// if err != nil {
