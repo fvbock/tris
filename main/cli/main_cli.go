@@ -128,7 +128,7 @@ func main() {
 			}
 
 			// SOURCE cmd. read script file
-			if strings.ToUpper(command[:6]) == "SOURCE" {
+			if len(command) > 8 && strings.ToUpper(command[:6]) == "SOURCE" {
 				fname := strings.Trim(command[6:], " \n")
 				fmt.Println("OPEN source file:", fname)
 				sourcedFile, err := ioutil.ReadFile(fname)
@@ -174,6 +174,9 @@ func main() {
 				var response *trisserver.Reply
 				var err error
 				switch cmdname {
+				case "SOURCE":
+					fmt.Println("Nested sourcing is currently not supported.")
+					break cmdexec
 				case "PING":
 					response, err = client.Ping()
 				case "SELECT":
