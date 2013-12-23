@@ -193,6 +193,14 @@ func (c *Client) PrefixMembers(key string) (r *tris.Reply, err error) {
 	return
 }
 
-// TrisCommands = append(TrisCommands, &CommandTree{})
-// TrisCommands = append(TrisCommands, &CommandTiming{})
+func (c *Client) Tree() (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandTree{})
+	return
+}
+
+func (c *Client) Timing() (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandTiming{})
+	return
+}
+
 // TrisCommands = append(TrisCommands, &CommandShutdown{})

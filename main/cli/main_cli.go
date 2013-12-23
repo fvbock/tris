@@ -134,19 +134,13 @@ func main() {
 				sourcedFile, err := ioutil.ReadFile(fname)
 				if err != nil {
 					fmt.Println("ERR opening source file:", err)
+					// reset state
+					command = ""
+					ierr = nil
 					continue
 				}
 				command = string(sourcedFile)
 			}
-			// // nama
-			// r, err := client.Send(command)
-			// if err != nil {
-			// 	fmt.Println("Error:", err)
-			// }
-
-			// response := trisserver.Unserialize(r)
-			// // fmt.Println(response)
-			// response.Print()
 
 			// use lib
 			var cmds []string
@@ -207,6 +201,10 @@ func main() {
 					response, err = client.Members()
 				case "PREFIXMEMBERS":
 					response, err = client.PrefixMembers(args[i][0])
+				case "TREE":
+					response, err = client.Tree()
+				case "TIMING":
+					response, err = client.Timing()
 				default:
 					fmt.Println("Unknown command.")
 					break cmdexec
