@@ -146,7 +146,7 @@ func main() {
 			var cmds []string
 			var args [][]string
 			msgs := strings.Split(strings.Trim(command, " "), "\n")
-			fmt.Println("msgs", msgs)
+			// fmt.Println("msgs", msgs)
 			for n, msg := range msgs {
 				parts := strings.Split(strings.Trim(msg, " "), " ")
 				for i, p := range parts {
@@ -161,7 +161,7 @@ func main() {
 					}
 				}
 			}
-			fmt.Println("cmds, args", cmds, args)
+			// fmt.Println("cmds, args", cmds, args)
 
 		cmdexec:
 			for i, cmdname := range cmds {

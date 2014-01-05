@@ -103,7 +103,7 @@ func (c *Client) exec(cmd tris.Command, args ...string) (response *tris.Reply, e
 	if response.ReturnCode != tris.COMMAND_OK {
 		log.Printf("FAILED:\ncmd: %s\nargs: %v\nresponse: %v\n", cmd, args, response)
 	} else {
-		log.Printf("cmd: %s\nargs: %v\nresponse: %v\n", cmd.Name(), args, response)
+		// log.Printf("cmd: %s\nargs: %v\nresponse: %v\n", cmd.Name(), args, response)
 	}
 	// response.Print()
 	return

@@ -9,7 +9,12 @@ import (
 	// "time"
 )
 
-const ()
+const (
+	REPLY_TYPE_BOOL   = 0
+	REPLY_TYPE_INT    = 1
+	REPLY_TYPE_STRING = 2
+	// REPLY_TYPE_FLOAT  = 3
+)
 
 type Reply struct {
 	Payload [][]byte
@@ -18,6 +23,12 @@ type Reply struct {
 	Type       int64
 	Length     int64 // the nr of fields in one "reply row"
 	Signature  []int // the fields in one "reply row"
+}
+
+type ReplyData struct {
+	Key   string
+	Count int64
+	Data  interface{}
 }
 
 func (r *Reply) Print() {
@@ -35,21 +46,106 @@ func (r *Reply) Print() {
 }
 
 func (r *Reply) Serialize() (ser []byte) {
+	// first the return code
 	rc := make([]byte, 1)
 	_ = binary.PutVarint(rc, r.ReturnCode)
 	ser = append(ser, rc...)
+	// response length (fields per reply item)
 	rl := make([]byte, 1)
-	_ = binary.PutVarint(rl, r.Length)
+	// _ = binary.PutVarint(rl, r.Length)
+	_ = binary.PutVarint(rl, int64(len(r.Signature)))
 	ser = append(ser, rl...)
+	// serializing the payload(s) - the single reply items
 	for _, payload := range r.Payload {
+		// byte length of the item
 		pl := make([]byte, 4)
 		_ = binary.PutVarint(pl, int64(len(payload)))
 		ser = append(ser, pl...)
+		// adding the items data
 		ser = append(ser, payload...)
 	}
+	// for idx, payload := range r.Payload {
+	// 	rtype := r.Signature[idx%len(r.Signature)]
+	// 	switch rtype {
+	// 	case REPLY_TYPE_BOOL:
+	// 		// TODO: dont use strings
+	// 		if string(payload) == "TRUE" {
+	// 			_ = binary.PutVarint(pl, int64(1))
+	// 		} else {
+	// 			_ = binary.PutVarint(pl, int64(0))
+	// 		}
+	// 	case REPLY_TYPE_INT:
+	// 		pl := make([]byte, 4)
+	// 		_ = binary.PutVarint(pl, int64(len(payload)))
+	// 	case REPLY_TYPE_STRING:
+	// 		// byte length of the item
+	// 		pl := make([]byte, 4)
+	// 		_ = binary.PutVarint(pl, int64(len(payload)))
+	// 		ser = append(ser, pl...)
+	// 		// adding the items data
+	// 		ser = append(ser, payload...)
+	// 	}
+	// }
 
 	return
 }
+
+func encodeBoolReply(r bool) (br []byte) {
+	if r {
+		br := make([]byte, 1)
+		_ = binary.PutVarint(br, int64(1))
+	} else {
+		_ = binary.PutVarint(br, int64(0))
+	}
+	return
+}
+
+func decodeBoolReply(reply *bytes.Reader) (r bool) {
+	rval, _, err := tris.ReadVarint(reply)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if rval == 1 {
+		r = true
+	} else {
+		r = false
+	}
+	return
+}
+
+func encodeIntReply(r int64) (ir []byte) {
+	ir = make([]byte, 4)
+	_ = binary.PutVarint(ir, r)
+	return
+}
+
+func decodeIntReply(reply *bytes.Reader) (r int64) {
+	r, bl, err := tris.ReadVarint(reply)
+	if err != nil {
+		if err == io.EOF {
+
+		}
+		fmt.Println(err)
+	}
+	reply.Seek(int64(4-bl), 1)
+
+	return
+}
+
+func encodeStringReply(r string) (sr []byte) {
+	// byte length of the item
+	pl := make([]byte, 4)
+	_ = binary.PutVarint(pl, int64(len(r)))
+	sr = append(sr, pl...)
+	// adding the items data
+	sr = append(sr, r...)
+	return
+}
+
+// func encodeFloatReply(r int64) {
+// }
+// func decodeFloatReply(r int64) {
+// }
 
 func Unserialize(r []byte) *Reply {
 	// var unserStart = time.Now()
@@ -64,7 +160,7 @@ func Unserialize(r []byte) *Reply {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println("rc, rl", rc, rl)
+	// fmt.Println("rc, rl", rc, rl)
 	reply := &Reply{
 		ReturnCode: rc,
 		Length:     rl,

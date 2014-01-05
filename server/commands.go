@@ -20,10 +20,6 @@ const (
 
 	COMMAND_OK   = 0
 	COMMAND_FAIL = 1
-
-	REPLY_TYPE_BOOL   = 0
-	REPLY_TYPE_INT    = 1
-	REPLY_TYPE_STRING = 2
 )
 
 var (
