@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/fvbock/trie"
 	"sort"
-	"strconv"
 )
 
 const (
@@ -90,7 +89,7 @@ Commands Processed: %v
 Commands Running: %v
 `, VERSION, s.Config.Host, s.Config.Port, s.Config.DataDir, DEFAULT_DB, dbList, len(s.ActiveClients), s.CommandsProcessed, s.RequestsRunning)
 
-	reply = NewReply([][]byte{[]byte(fmt.Sprintf("SERVER\n%v\nCLIENT\n%s", serverStr, c))}, COMMAND_OK, cmd.ResponseLength())
+	reply = NewReply([][]byte{[]byte(fmt.Sprintf("SERVER\n%v\nCLIENT\n%s", serverStr, c))}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	return
 }
 
@@ -114,7 +113,7 @@ func (cmd *CommandDbInfo) Function(s *Server, c *ClientConnection, args ...inter
  PersistInterval: %v
 `, c.ActiveDb.Name, c.ActiveDb.OpsCount, c.ActiveDb.LastPersistOpsCount, c.ActiveDb.PersistOpsLimit, c.ActiveDb.LastPersistTime, c.ActiveDb.PersistInterval)
 
-	reply = NewReply([][]byte{[]byte(dbInfo)}, COMMAND_OK, cmd.ResponseLength())
+	reply = NewReply([][]byte{[]byte(dbInfo)}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	return
 }
 
@@ -131,7 +130,7 @@ func (cmd *CommandExit) ResponseSignature() []int { return []int{} }
 func (cmd *CommandExit) Help() string             { return "TODO" }
 func (cmd *CommandExit) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	s.InactiveClientIds <- string(c.Id)
-	reply = NewReply([][]byte{[]byte("")}, COMMAND_OK, cmd.ResponseLength())
+	reply = NewReply([][]byte{[]byte("")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	return
 }
 
@@ -147,7 +146,7 @@ func (cmd *CommandPing) ResponseLength() int64    { return 1 }
 func (cmd *CommandPing) ResponseSignature() []int { return []int{REPLY_TYPE_STRING} }
 func (cmd *CommandPing) Help() string             { return "TODO" }
 func (cmd *CommandPing) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
-	reply = NewReply([][]byte{[]byte("0")}, COMMAND_OK, cmd.ResponseLength())
+	reply = NewReply([][]byte{[]byte("0")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	return
 }
 
@@ -167,11 +166,11 @@ func (cmd *CommandSelect) Function(s *Server, c *ClientConnection, args ...inter
 	name := args[0].(string)
 	if !s.dbExists(name) {
 		err := fmt.Sprintf("Databases %s does not exist.", name)
-		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 	c.ActiveDb = s.Databases[name]
 	// c.ActiveDbName = name
-	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -192,16 +191,16 @@ func (cmd *CommandCreateTrie) Function(s *Server, c *ClientConnection, args ...i
 	defer s.Unlock()
 	if s.dbExists(name) {
 		err := fmt.Sprintf("Databases %s has already been registered.", name)
-		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 	s.NewDatabase(name)
 	err := s.Databases[name].Persist(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, name))
 	if err != nil {
 		errMsg := fmt.Sprintf("Could persist the new db %s: %v", name, err)
 		s.Log.Println(errMsg)
-		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
-	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -218,7 +217,7 @@ func (cmd *CommandAdd) Help() string             { return "TODO" }
 func (cmd *CommandAdd) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	b := c.ActiveDb.Db.Add(key)
-	return NewReply([][]byte{[]byte(string(b.Count))}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{[]byte(encodeIntReply(b.Count))}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -235,9 +234,9 @@ func (cmd *CommandDel) Help() string             { return "TODO" }
 func (cmd *CommandDel) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	if c.ActiveDb.Db.Delete(key) {
-		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK, cmd.ResponseLength())
+		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	}
-	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -254,9 +253,9 @@ func (cmd *CommandHas) Help() string             { return "TODO" }
 func (cmd *CommandHas) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	if c.ActiveDb.Db.Has(key) {
-		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK, cmd.ResponseLength())
+		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	}
-	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -273,7 +272,7 @@ func (cmd *CommandHasCount) Help() string             { return "TODO" }
 func (cmd *CommandHasCount) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	_, count := c.ActiveDb.Db.HasCount(key)
-	return NewReply([][]byte{[]byte(strconv.FormatInt(int64(count), 10))}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{[]byte(encodeIntReply(count))}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -290,9 +289,9 @@ func (cmd *CommandHasPrefix) Help() string             { return "TODO" }
 func (cmd *CommandHasPrefix) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	if c.ActiveDb.Db.HasPrefix(key) {
-		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK, cmd.ResponseLength())
+		return NewReply([][]byte{[]byte("TRUE")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	}
-	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{[]byte("FALSE")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -307,7 +306,7 @@ func (cmd *CommandTree) ResponseLength() int64    { return 1 }
 func (cmd *CommandTree) ResponseSignature() []int { return []int{REPLY_TYPE_STRING} }
 func (cmd *CommandTree) Help() string             { return "TODO" }
 func (cmd *CommandTree) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
-	return NewReply([][]byte{[]byte(c.ActiveDb.Db.Dump())}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{[]byte(c.ActiveDb.Db.Dump())}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -324,14 +323,15 @@ func (cmd *CommandMembers) Help() string             { return "TODO" }
 func (cmd *CommandMembers) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	var mrep [][]byte
 	for _, m := range c.ActiveDb.Db.Members() {
-		count := make([]byte, 4)
-		_ = binary.PutVarint(count, m.Count)
-		mrep = append(mrep, []byte(m.Value), count)
+		mrep = append(mrep, []byte(m.Value), encodeIntReply(m.Count))
+		// count := make([]byte, 4)
+		// _ = binary.PutVarint(count, m.Count)
+		// mrep = append(mrep, []byte(m.Value), count)
 		// mrep = append(mrep, []byte(m.Value), []byte(string(m.Count)))
 		// s.Log.Println(string(m.Count), []byte(string(m.Count)))
 	}
 
-	return NewReply(mrep, COMMAND_OK, cmd.ResponseLength())
+	return NewReply(mrep, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -357,7 +357,7 @@ func (cmd *CommandPrefixMembers) Function(s *Server, c *ClientConnection, args .
 		// mrep = append(mrep, []byte(m.Value), []byte(string(m.Count)))
 	}
 
-	return NewReply(mrep, COMMAND_OK, cmd.ResponseLength())
+	return NewReply(mrep, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -377,7 +377,7 @@ func (cmd *CommandTiming) Function(s *Server, c *ClientConnection, args ...inter
 	} else {
 		c.ShowExecTime = true
 	}
-	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -399,7 +399,7 @@ func (cmd *CommandImportDb) Function(s *Server, c *ClientConnection, args ...int
 		err := fmt.Sprintf("Databases %s already exists.", dbname)
 		s.Log.Println(err)
 		s.Unlock()
-		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 	s.NewDatabase(dbname)
 	s.Unlock()
@@ -411,7 +411,7 @@ func (cmd *CommandImportDb) Function(s *Server, c *ClientConnection, args ...int
 		err := fmt.Sprintf("Database import failed: %v", err)
 		s.Log.Println(err)
 		delete(s.Databases, dbname)
-		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 
 	// persist the db
@@ -419,9 +419,9 @@ func (cmd *CommandImportDb) Function(s *Server, c *ClientConnection, args ...int
 	if err != nil {
 		errMsg := fmt.Sprintf("Could persist the imported db %s: %v", dbname, err)
 		s.Log.Println(errMsg)
-		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
-	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -441,7 +441,7 @@ func (cmd *CommandMergeDb) Function(s *Server, c *ClientConnection, args ...inte
 	if err != nil {
 		err := fmt.Sprintf("Database merge failed: %v", err)
 		s.Log.Println(err)
-		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 
 	// backup?
@@ -451,9 +451,9 @@ func (cmd *CommandMergeDb) Function(s *Server, c *ClientConnection, args ...inte
 	if err != nil {
 		errMsg := fmt.Sprintf("Could persist the mergeed db %s: %v", c.ActiveDb.Name, err)
 		s.Log.Println(errMsg)
-		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
-	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -470,7 +470,7 @@ func (cmd *CommandSave) Help() string             { return "TODO" }
 func (cmd *CommandSave) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	if c.ActiveDb.Name == DEFAULT_DB {
 		err := fmt.Sprintf("Manually saving the default DB is not permitted.")
-		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(err)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 
 	srcFilePath := fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, c.ActiveDb.Name)
@@ -478,16 +478,16 @@ func (cmd *CommandSave) Function(s *Server, c *ClientConnection, args ...interfa
 	err := c.ActiveDb.Backup(srcFilePath, dstPath, c.ActiveDb.Name)
 	if err != nil {
 		errMsg := fmt.Sprintf("Backup failed: %v", err)
-		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 
 	err = c.ActiveDb.Persist(srcFilePath)
 	if err != nil {
 		errMsg := fmt.Sprintf("Backup failed: %v", err)
-		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1)
+		return NewReply([][]byte{[]byte(errMsg)}, COMMAND_FAIL, 1, cmd.ResponseSignature())
 	}
 
-	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
 
 /*
@@ -503,5 +503,5 @@ func (cmd *CommandShutdown) ResponseSignature() []int { return []int{} }
 func (cmd *CommandShutdown) Help() string             { return "TODO" }
 func (cmd *CommandShutdown) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	s.Stop()
-	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength())
+	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
