@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/fvbock/trie"
 	"sort"
+	"strings"
 )
 
 const (
@@ -53,7 +54,7 @@ func (cmd *CommandInfo) Flags() int               { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandInfo) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandInfo) ResponseLength() int64    { return 1 }
 func (cmd *CommandInfo) ResponseSignature() []int { return []int{REPLY_TYPE_STRING} }
-func (cmd *CommandInfo) Help() string             { return "TODO" }
+func (cmd *CommandInfo) Help() string             { return "TODO: CommandInfo text" }
 func (cmd *CommandInfo) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	var dbNames sort.StringSlice
 	var dbList string
@@ -103,7 +104,7 @@ func (cmd *CommandDbInfo) Flags() int               { return COMMAND_FLAG_ADMIN 
 func (cmd *CommandDbInfo) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandDbInfo) ResponseLength() int64    { return 1 }
 func (cmd *CommandDbInfo) ResponseSignature() []int { return []int{REPLY_TYPE_STRING} }
-func (cmd *CommandDbInfo) Help() string             { return "TODO" }
+func (cmd *CommandDbInfo) Help() string             { return "TODO: CommandDbInfo text" }
 func (cmd *CommandDbInfo) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	dbInfo := fmt.Sprintf(`DBINFO for database %s:
  OpsCount: %v
@@ -127,7 +128,7 @@ func (cmd *CommandExit) Flags() int               { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandExit) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandExit) ResponseLength() int64    { return 0 }
 func (cmd *CommandExit) ResponseSignature() []int { return []int{} }
-func (cmd *CommandExit) Help() string             { return "TODO" }
+func (cmd *CommandExit) Help() string             { return "TODO: CommandExit text" }
 func (cmd *CommandExit) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	s.InactiveClientIds <- string(c.Id)
 	reply = NewReply([][]byte{[]byte("")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
@@ -144,7 +145,7 @@ func (cmd *CommandPing) Flags() int               { return COMMAND_FLAG_ADMIN }
 func (cmd *CommandPing) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandPing) ResponseLength() int64    { return 1 }
 func (cmd *CommandPing) ResponseSignature() []int { return []int{REPLY_TYPE_STRING} }
-func (cmd *CommandPing) Help() string             { return "TODO" }
+func (cmd *CommandPing) Help() string             { return "TODO: CommandPing text" }
 func (cmd *CommandPing) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	reply = NewReply([][]byte{[]byte("0")}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 	return
@@ -160,7 +161,7 @@ func (cmd *CommandSelect) Flags() int               { return COMMAND_FLAG_ADMIN 
 func (cmd *CommandSelect) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandSelect) ResponseLength() int64    { return 0 }
 func (cmd *CommandSelect) ResponseSignature() []int { return []int{} }
-func (cmd *CommandSelect) Help() string             { return "TODO" }
+func (cmd *CommandSelect) Help() string             { return "TODO: CommandSelect text" }
 func (cmd *CommandSelect) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// name := string(args[0].([]byte))
 	name := args[0].(string)
@@ -183,7 +184,7 @@ func (cmd *CommandCreateTrie) Flags() int               { return COMMAND_FLAG_AD
 func (cmd *CommandCreateTrie) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandCreateTrie) ResponseLength() int64    { return 0 }
 func (cmd *CommandCreateTrie) ResponseSignature() []int { return []int{} }
-func (cmd *CommandCreateTrie) Help() string             { return "TODO" }
+func (cmd *CommandCreateTrie) Help() string             { return "TODO: CommandCreateTrie text" }
 func (cmd *CommandCreateTrie) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	// name := string(args[0].([]byte))
 	name := args[0].(string)
@@ -213,7 +214,7 @@ func (cmd *CommandAdd) Flags() int               { return COMMAND_FLAG_WRITE }
 func (cmd *CommandAdd) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandAdd) ResponseLength() int64    { return 1 }
 func (cmd *CommandAdd) ResponseSignature() []int { return []int{REPLY_TYPE_INT} }
-func (cmd *CommandAdd) Help() string             { return "TODO" }
+func (cmd *CommandAdd) Help() string             { return "TODO: CommandAdd text" }
 func (cmd *CommandAdd) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	b := c.ActiveDb.Db.Add(key)
@@ -230,7 +231,7 @@ func (cmd *CommandDel) Flags() int               { return COMMAND_FLAG_WRITE }
 func (cmd *CommandDel) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandDel) ResponseLength() int64    { return 1 }
 func (cmd *CommandDel) ResponseSignature() []int { return []int{REPLY_TYPE_BOOL} }
-func (cmd *CommandDel) Help() string             { return "TODO" }
+func (cmd *CommandDel) Help() string             { return "TODO: CommandDel text" }
 func (cmd *CommandDel) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	if c.ActiveDb.Db.Delete(key) {
@@ -249,7 +250,7 @@ func (cmd *CommandHas) Flags() int               { return COMMAND_FLAG_READ }
 func (cmd *CommandHas) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandHas) ResponseLength() int64    { return 1 }
 func (cmd *CommandHas) ResponseSignature() []int { return []int{REPLY_TYPE_BOOL} }
-func (cmd *CommandHas) Help() string             { return "TODO" }
+func (cmd *CommandHas) Help() string             { return "TODO: CommandHas text" }
 func (cmd *CommandHas) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	if c.ActiveDb.Db.Has(key) {
@@ -268,7 +269,7 @@ func (cmd *CommandHasCount) Flags() int               { return COMMAND_FLAG_READ
 func (cmd *CommandHasCount) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandHasCount) ResponseLength() int64    { return 1 }
 func (cmd *CommandHasCount) ResponseSignature() []int { return []int{REPLY_TYPE_INT} }
-func (cmd *CommandHasCount) Help() string             { return "TODO" }
+func (cmd *CommandHasCount) Help() string             { return "TODO: CommandHasCount text" }
 func (cmd *CommandHasCount) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	_, count := c.ActiveDb.Db.HasCount(key)
@@ -285,7 +286,7 @@ func (cmd *CommandHasPrefix) Flags() int               { return COMMAND_FLAG_REA
 func (cmd *CommandHasPrefix) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandHasPrefix) ResponseLength() int64    { return 1 }
 func (cmd *CommandHasPrefix) ResponseSignature() []int { return []int{REPLY_TYPE_BOOL} }
-func (cmd *CommandHasPrefix) Help() string             { return "TODO" }
+func (cmd *CommandHasPrefix) Help() string             { return "TODO: CommandHasPrefix text" }
 func (cmd *CommandHasPrefix) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	if c.ActiveDb.Db.HasPrefix(key) {
@@ -304,7 +305,7 @@ func (cmd *CommandTree) Flags() int               { return COMMAND_FLAG_READ }
 func (cmd *CommandTree) ResponseType() int        { return COMMAND_REPLY_SINGLE }
 func (cmd *CommandTree) ResponseLength() int64    { return 1 }
 func (cmd *CommandTree) ResponseSignature() []int { return []int{REPLY_TYPE_STRING} }
-func (cmd *CommandTree) Help() string             { return "TODO" }
+func (cmd *CommandTree) Help() string             { return "TODO: CommandTree text" }
 func (cmd *CommandTree) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	return NewReply([][]byte{[]byte(c.ActiveDb.Db.Dump())}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
 }
@@ -319,7 +320,7 @@ func (cmd *CommandMembers) Flags() int               { return COMMAND_FLAG_READ 
 func (cmd *CommandMembers) ResponseType() int        { return COMMAND_REPLY_MULTI }
 func (cmd *CommandMembers) ResponseLength() int64    { return 2 }
 func (cmd *CommandMembers) ResponseSignature() []int { return []int{REPLY_TYPE_STRING, REPLY_TYPE_INT} }
-func (cmd *CommandMembers) Help() string             { return "TODO" }
+func (cmd *CommandMembers) Help() string             { return "TODO: CommandMembers text" }
 func (cmd *CommandMembers) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	var mrep [][]byte
 	for _, m := range c.ActiveDb.Db.Members() {
@@ -346,7 +347,7 @@ func (cmd *CommandPrefixMembers) ResponseLength() int64 { return 2 }
 func (cmd *CommandPrefixMembers) ResponseSignature() []int {
 	return []int{REPLY_TYPE_STRING, REPLY_TYPE_INT}
 }
-func (cmd *CommandPrefixMembers) Help() string { return "TODO" }
+func (cmd *CommandPrefixMembers) Help() string { return "TODO: CommandPrefixMembers text" }
 func (cmd *CommandPrefixMembers) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	key := args[0].(string)
 	var mrep [][]byte
@@ -370,7 +371,7 @@ func (cmd *CommandTiming) Flags() int               { return COMMAND_FLAG_ADMIN 
 func (cmd *CommandTiming) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandTiming) ResponseLength() int64    { return 0 }
 func (cmd *CommandTiming) ResponseSignature() []int { return []int{} }
-func (cmd *CommandTiming) Help() string             { return "TODO" }
+func (cmd *CommandTiming) Help() string             { return "TODO: CommandTiming text" }
 func (cmd *CommandTiming) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	if c.ShowExecTime {
 		c.ShowExecTime = false
@@ -390,7 +391,7 @@ func (cmd *CommandImportDb) Flags() int               { return COMMAND_FLAG_ADMI
 func (cmd *CommandImportDb) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandImportDb) ResponseLength() int64    { return 0 }
 func (cmd *CommandImportDb) ResponseSignature() []int { return []int{} }
-func (cmd *CommandImportDb) Help() string             { return "TODO" }
+func (cmd *CommandImportDb) Help() string             { return "TODO: CommandImportDb text" }
 func (cmd *CommandImportDb) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	filename := args[0].(string)
 	dbname := args[1].(string)
@@ -434,7 +435,7 @@ func (cmd *CommandMergeDb) Flags() int               { return COMMAND_FLAG_WRITE
 func (cmd *CommandMergeDb) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandMergeDb) ResponseLength() int64    { return 0 }
 func (cmd *CommandMergeDb) ResponseSignature() []int { return []int{} }
-func (cmd *CommandMergeDb) Help() string             { return "TODO" }
+func (cmd *CommandMergeDb) Help() string             { return "TODO: CommandMergeDb text" }
 func (cmd *CommandMergeDb) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	filename := args[0].(string)
 	err := c.ActiveDb.Db.MergeFromFile(filename)
@@ -466,7 +467,7 @@ func (cmd *CommandSave) Flags() int               { return COMMAND_FLAG_WRITE }
 func (cmd *CommandSave) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandSave) ResponseLength() int64    { return 0 }
 func (cmd *CommandSave) ResponseSignature() []int { return []int{} }
-func (cmd *CommandSave) Help() string             { return "TODO" }
+func (cmd *CommandSave) Help() string             { return "TODO: CommandSave text" }
 func (cmd *CommandSave) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	if c.ActiveDb.Name == DEFAULT_DB {
 		err := fmt.Sprintf("Manually saving the default DB is not permitted.")
@@ -500,8 +501,29 @@ func (cmd *CommandShutdown) Flags() int               { return COMMAND_FLAG_ADMI
 func (cmd *CommandShutdown) ResponseType() int        { return COMMAND_REPLY_EMPTY }
 func (cmd *CommandShutdown) ResponseLength() int64    { return 0 }
 func (cmd *CommandShutdown) ResponseSignature() []int { return []int{} }
-func (cmd *CommandShutdown) Help() string             { return "TODO" }
+func (cmd *CommandShutdown) Help() string             { return "TODO: CommandShutdown text" }
 func (cmd *CommandShutdown) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
 	s.Stop()
 	return NewReply([][]byte{}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
+}
+
+/*
+CommandHelp shuts down the server
+*/
+type CommandHelp struct{}
+
+func (cmd *CommandHelp) Name() string             { return "HELP" }
+func (cmd *CommandHelp) Flags() int               { return COMMAND_FLAG_ADMIN }
+func (cmd *CommandHelp) ResponseType() int        { return COMMAND_REPLY_SINGLE }
+func (cmd *CommandHelp) ResponseLength() int64    { return 1 }
+func (cmd *CommandHelp) ResponseSignature() []int { return []int{REPLY_TYPE_STRING} }
+func (cmd *CommandHelp) Help() string             { return "HELP help: TODO" }
+func (cmd *CommandHelp) Function(s *Server, c *ClientConnection, args ...interface{}) (reply *Reply) {
+	cmdName := strings.ToUpper(args[0].(string))
+	if _, exists := s.Commands[cmdName]; !exists {
+		reply = NewReply([][]byte{[]byte(fmt.Sprintf("Unknown Command %s.\n\n%s", cmdName, cmd.Help()))}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
+	} else {
+		reply = NewReply([][]byte{[]byte(fmt.Sprintf("\n%s\n", s.Commands[cmdName].Help()))}, COMMAND_OK, cmd.ResponseLength(), cmd.ResponseSignature())
+	}
+	return
 }

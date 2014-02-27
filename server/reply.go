@@ -71,24 +71,19 @@ func (r *Reply) Print() {
 				fmt.Println("ERROR: got unknown response type:", rType)
 			}
 
-			if rCount%len(r.Signature) == 0 {
-				fmt.Printf("%v) %s\n", n, row)
-				iLen = len(fmt.Sprintf("%v", n))
-				n++
+			if len(r.Signature) == 1 && r.Signature[0] == REPLY_TYPE_STRING {
+				fmt.Printf("%s\n", row)
 			} else {
-				fmt.Printf("%s%s\n", strings.Repeat(" ", iLen+2), row)
+				if rCount%len(r.Signature) == 0 {
+					fmt.Printf("%v) %s\n", n, row)
+					iLen = len(fmt.Sprintf("%v", n))
+					n++
+				} else {
+					fmt.Printf("%s%s\n", strings.Repeat(" ", iLen+2), row)
+				}
 			}
-			// }
-			// fmt.Printf("%v) %s\n", rCount, row)
 		}
 
-		// if len(r.Payload) == 1 {
-		// 	fmt.Printf("%s\n", r.Payload[0])
-		// } else {
-		// 	for i, rep := range r.Payload {
-		// 		fmt.Printf("%v) %s\n", i+1, rep)
-		// 	}
-		// }
 		return
 	}
 	fmt.Printf("%s (Return code %v)\n", r.Payload[0], r.ReturnCode)

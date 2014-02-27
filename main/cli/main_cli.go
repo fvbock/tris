@@ -167,6 +167,7 @@ func main() {
 			for i, cmdname := range cmds {
 				var response *trisserver.Reply
 				var err error
+				// TODO: check arg count. type too? can we access the signature?
 				switch cmdname {
 				case "SOURCE":
 					fmt.Println("Nested sourcing is currently not supported.")
@@ -174,6 +175,9 @@ func main() {
 				case "PING":
 					response, err = client.Ping()
 				case "SELECT":
+					if len(args) < 1 {
+						fmt.Printf("Not enough arguments: %s, %s\n", cmdname)
+					}
 					response, err = client.Select(args[i][0])
 				case "DBINFO":
 					response, err = client.DbInfo()
@@ -205,6 +209,8 @@ func main() {
 					response, err = client.Tree()
 				case "TIMING":
 					response, err = client.Timing()
+				case "HELP":
+					response, err = client.Help(args[i][0])
 				default:
 					fmt.Println("Unknown command.")
 					break cmdexec

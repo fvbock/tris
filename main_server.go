@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/davecheney/profile"
 	"github.com/fvbock/tris/server"
 	"runtime"
 	"time"
@@ -24,6 +25,15 @@ func init() {
 }
 
 func main() {
+	profileConfig := profile.Config{
+		CPUProfile:     true,
+		MemProfile:     true,
+		ProfilePath:    ".",  // store profiles in current directory
+		NoShutdownHook: true, // do not hook SIGINT
+	}
+	prof := profile.Start(&profileConfig)
+	defer prof.Stop()
+
 	server, err := tris.NewServer(config)
 	if err != nil {
 		server.Log.Printf("Could not initialize server: %v\n", err)

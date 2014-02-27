@@ -20,6 +20,7 @@ type Database struct {
 	LastPersistTime     int64
 	PersistInterval     time.Duration
 	PersistTicker       time.Ticker
+	// DbFileLock          sync.Mutex
 }
 
 func (d *Database) Persist(fname string) (err error) {

@@ -204,3 +204,8 @@ func (c *Client) Timing() (r *tris.Reply, err error) {
 }
 
 // TrisCommands = append(TrisCommands, &CommandShutdown{})
+
+func (c *Client) Help(key string) (r *tris.Reply, err error) {
+	r, err = c.exec(&tris.CommandHelp{}, key)
+	return
+}

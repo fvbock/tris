@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	// "runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -93,6 +94,7 @@ func (s *Server) Initialize() {
 	TrisCommands = append(TrisCommands, &CommandTree{})
 	TrisCommands = append(TrisCommands, &CommandTiming{})
 	TrisCommands = append(TrisCommands, &CommandShutdown{})
+	TrisCommands = append(TrisCommands, &CommandHelp{})
 	s.registerCommands(TrisCommands...)
 
 	//
@@ -177,22 +179,28 @@ func (s *Server) Start() (err error) {
 			zmq.PollItem{Socket: s.Socket, Events: zmq.POLLIN},
 		}
 
+		// var memstats *runtime.MemStats
 		var cycleLength int64
 		var cycleStart time.Time
 		s.cycleTicker = time.Tick(time.Duration(s.CycleLength) * time.Nanosecond)
 		stateTicker := time.Tick(s.CheckStateChange)
 	mainLoop:
 		for {
+			// s.Log.Println("* cycle start *")
+			s.printMemStats()
 			cycleStart = time.Now()
 
 			// make the poller run in a sep goroutine and push to a channel?
 			if s.RequestsRunning > 0 {
 				s.Lock()
+				s.Log.Println("poll 1", s.ActiveClients)
 				_, _ = zmq.Poll(s.pollItems, 1)
 				s.Unlock()
 			} else {
+				s.Log.Println("poll 1 sec", s.ActiveClients)
 				_, _ = zmq.Poll(s.pollItems, time.Second*1)
 			}
+			s.printMemStats()
 			switch {
 			case s.pollItems[0].REvents&zmq.POLLIN != 0:
 				s.Lock()
@@ -234,12 +242,16 @@ func (s *Server) Start() (err error) {
 					// s.Log.Println(".")
 				}
 			}
+			s.printMemStats()
 			s.beforeSleep()
 			cycleLength = time.Now().UnixNano() - cycleStart.UnixNano()
 			if cycleLength < s.CycleLength {
-				d := (s.CycleLength - cycleLength)
-				time.Sleep(time.Duration(d) * time.Nanosecond)
+				d := time.Duration(s.CycleLength-cycleLength) * time.Nanosecond
+				s.Log.Printf("+ sleep %v +\n", d)
+				time.Sleep(d)
 			}
+			// s.printMemStats()
+			// s.Log.Println("+ cycle end +")
 		}
 		s.prepareShutdown()
 		s.Log.Println("Server stopped running...")
@@ -259,7 +271,7 @@ beforeSleepCycle:
 			delete(s.ActiveClients, cId)
 			continue
 		default:
-			break
+			break beforeSleepCycle
 		}
 	}
 	return
@@ -327,6 +339,7 @@ func (s *Server) handleRequest(msgParts [][]byte) {
 	if c.ShowExecTime {
 		s.Log.Printf("%s %v took %v\n", cmds, args, time.Since(execStart))
 	}
+	// runtime.GC()
 }
 
 func (s *Server) Stop() {
@@ -347,6 +360,7 @@ func (s *Server) prepareShutdown() {
 	for _, db := range s.Databases {
 		waitPersist.Add(1)
 		go func(d *Database) {
+			s.Log.Println("Persist:", fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, d.Name))
 			d.Persist(fmt.Sprintf("%s/%s%s", s.Config.DataDir, s.Config.StorageFilePrefix, d.Name))
 			waitPersist.Done()
 		}(db)
@@ -361,7 +375,7 @@ func (s *Server) shutdown() {
 	s.Context.Close()
 	s.Log.Println("Context closed.")
 	s.Log.Println("Stopped server.")
-	os.Exit(0)
+	// os.Exit(0)
 }
 
 func (s *Server) registerCommands(cmds ...Command) (err error) {
@@ -381,6 +395,13 @@ func (s *Server) dbExists(name string) bool {
 		return false
 	}
 	return true
+}
+
+func (s *Server) printMemStats() {
+	// memstats := new(runtime.MemStats)
+	// runtime.ReadMemStats(memstats)
+	// s.Log.Printf("memstats before GC: bytes = %d footprint = %d mallocs = %d frees = %d",
+	// 	memstats.HeapAlloc, memstats.Sys, memstats.Mallocs, memstats.Frees)
 }
 
 func splitMsgs(payload []byte) (cmds []string, args [][]interface{}, err error) {
