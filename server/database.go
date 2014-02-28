@@ -21,6 +21,7 @@ type Database struct {
 	PersistInterval     time.Duration
 	PersistTicker       time.Ticker
 	// DbFileLock          sync.Mutex
+	// add a last access ticker to remove rarely accessed dbs from memory
 }
 
 func (d *Database) Persist(fname string) (err error) {
